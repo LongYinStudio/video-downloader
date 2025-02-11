@@ -23,13 +23,31 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["deb", "rpm", "nsis", "app"],
     "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
+      "icons/icon.png",
       "icons/icon.icns",
-      "icons/icon.ico"
+      "icons/icon.ico",
+      "icons/16x16.png",
+      "icons/16x16.icns",
+      "icons/16x16.ico",
+      "icons/24x24.png",
+      "icons/24x24.ico",
+      "icons/32x32.png",
+      "icons/32x32.icns",
+      "icons/32x32.ico",
+      "icons/48x48.png",
+      "icons/48x48.ico",
+      "icons/64x64.png",
+      "icons/64x64.ico",
+      "icons/128x128.png",
+      "icons/128x128.icns",
+      "icons/128x128.ico",
+      "icons/256x256.png",
+      "icons/256x256.ico",
+      "icons/512x512.png",
+      "icons/512x512.icns",
+      "icons/512x512.ico"
     ],
     "externalBin": ["bin/lux"]
   }

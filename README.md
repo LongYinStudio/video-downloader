@@ -1,6 +1,10 @@
 # 视频下载工具
 
 <div align="center">
+    <img alt="logo" src="./src-tauri/icons/logo.png"/>
+</div>
+
+<div align="center">
     <div>
        简体中文 |  <a href="./README.en-US.md">English</a>
     </div>

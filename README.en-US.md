@@ -1,6 +1,10 @@
 # Videos Downloader
 
 <div align="center">
+    <img alt="logo" src="./src-tauri/icons/logo.png"/>
+</div>
+
+<div align="center">
     <div>
        <a href="./README.md">简体中文</a> |  English
     </div>
