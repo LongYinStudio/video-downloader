@@ -6,6 +6,7 @@ BASE_URL="https://github.com/iawia002/lux/releases/latest/download"
 VERSION="0.24.1"
 
 # NOTE:linux和windows arm使用的太少了，默认不启用
+# lux重命名为mylux,避免与自己安装的lux冲突
 
 # 定义需要下载的文件列表
 FILES=(
@@ -18,12 +19,12 @@ FILES=(
 )
 # 定义目标文件名（Tauri 所需格式）
 TARGET_FILES=(
-	"lux-x86_64-unknown-linux-gnu" # Linux x86_64
-	# "lux-aarch64-unknown-linux-gnu"   # Linux ARM64
-	"lux-x86_64-apple-darwin"        # macOS x86_64
-	"lux-aarch64-apple-darwin"       # macOS ARM64
-	"lux-x86_64-pc-windows-msvc.exe" # Windows x86_64
-	# "lux-aarch64-pc-windows-msvc.exe" # Windows ARM64
+	"mylux-x86_64-unknown-linux-gnu" # Linux x86_64
+	# "mylux-aarch64-unknown-linux-gnu"   # Linux ARM64
+	"mylux-x86_64-apple-darwin"        # macOS x86_64
+	"mylux-aarch64-apple-darwin"       # macOS ARM64
+	"mylux-x86_64-pc-windows-msvc.exe" # Windows x86_64
+	# "mylux-aarch64-pc-windows-msvc.exe" # Windows ARM64
 )
 
 # 下载、解压并重命名文件

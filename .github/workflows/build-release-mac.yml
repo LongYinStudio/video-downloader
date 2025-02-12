@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-latest # 如果使用 M1 原生构建可改为 macos-14
 
     steps:
       # 检出代码
@@ -46,12 +46,34 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+          # targets: x86_64-apple-darwin
           components: rustfmt, clippy
+
+      # # 设置通用环境变量
+      # - name: Setup environment
+      #   run: |
+      #     echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+      #     echo "RUSTFLAGS=-C linker=arm64e-clang" >> $GITHUB_ENV  # 针对 ARM 优化
+
+      # 安装 macOS 构建依赖
+      - name: Install system dependencies
+        run: |
+          brew install pkg-config
+          brew install openssl@3
 
       # 构建 Tauri 应用
       - name: Build Tauri app
         run: |
-          pnpm run tauri build
+          pnpm run tauri build --target aarch64-apple-darwin
+          pnpm run tauri build --target x86_64-apple-darwin
+          # # 合并为 Universal Binary
+          # lipo -create \
+          #   src-tauri/target/x86_64-apple-darwin/release/video-downloader \
+          #   src-tauri/target/aarch64-apple-darwin/release/video-downloader \
+          #   -output src-tauri/target/universal-apple-darwin/release/video-downloader
+          # # 重新打包 Universal App
+          # pnpm tauri bundle --target universal-apple-darwin
         env:
           # 如果需要签名 macOS 应用，请设置以下环境变量
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -63,4 +85,5 @@ jobs:
         with:
           name: tauri-build-macos
           path: |
-            src-tauri/target/release/bundle/app/
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app/
+            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app/

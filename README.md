@@ -23,3 +23,24 @@
       />
     </div>
 </div>
+
+## 依赖
+
+- 确保 [ffmpeg](https://ffmpeg.org/download.html) 在系统上安装并配置好环境变量。
+  > Note: FFmpeg 不影响下载，只影响最终文件的合并。
+
+## 安装
+
+1. Archlinux
+
+   > video-downloader-longyinstudio(aur)
+
+```bash
+yay -S video-downloader-longyinstudio
+Or
+paru -S video-downloader-longyinstudio
+```
+
+2. Others
+
+   > 从[Release](https://github.com/LongYinStudio/video-downloader/releases/latest)下载对应的包

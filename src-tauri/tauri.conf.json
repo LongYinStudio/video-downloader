@@ -49,6 +49,15 @@
       "icons/512x512.icns",
       "icons/512x512.ico"
     ],
-    "externalBin": ["bin/lux"]
+    "externalBin": ["bin/mylux"],
+    "windows": {
+      "wix": {
+        "language": "zh-CN"
+      },
+      "nsis": {
+        "languages": ["SimpChinese"],
+        "installerIcon": "icons/icon.ico"
+      }
+    }
   }
 }
