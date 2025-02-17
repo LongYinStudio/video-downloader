@@ -47,12 +47,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
-          # targets: x86_64-apple-darwin
           components: rustfmt, clippy
 
-      # # 设置通用环境变量
-      # - name: Setup environment
-      #   run: |
+      # 设置通用环境变量
+      - name: Setup environment
+        run: |
+          # export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="clang"
+          # export CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER="clang"
       #     echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
       #     echo "RUSTFLAGS=-C linker=arm64e-clang" >> $GITHUB_ENV  # 针对 ARM 优化
 
@@ -65,8 +66,10 @@ jobs:
       # 构建 Tauri 应用
       - name: Build Tauri app
         run: |
-          pnpm run tauri build --target aarch64-apple-darwin
-          pnpm run tauri build --target x86_64-apple-darwin
+          # pnpm run tauri build --target aarch64-apple-darwin
+          # pnpm run tauri build --target x86_64-apple-darwin
+          pnpm run tauri build --target universal-apple-darwin
+
           # # 合并为 Universal Binary
           # lipo -create \
           #   src-tauri/target/x86_64-apple-darwin/release/video-downloader \
@@ -85,5 +88,4 @@ jobs:
         with:
           name: tauri-build-macos
           path: |
-            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app/
-            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app/
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app/
