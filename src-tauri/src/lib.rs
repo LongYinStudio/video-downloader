@@ -1,6 +1,8 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use directories::UserDirs;
+use std::env;
 use std::str;
+use tauri::Emitter;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
@@ -23,16 +25,13 @@ async fn download(url: &str, app: tauri::AppHandle) -> Result<(), String> {
     let download_dir = get_download_dir()?;
     println!("Download directory: {}", download_dir);
 
-    // 打印完整的命令和参数
-    println!("Running command: lux -o {} {}", download_dir, url);
-
     // `sidecar()` 只需要文件名, 不像 JavaScript 中的整个路径
     // format!("下载地址 url:{}", url);
-    let sidecar_command = app.shell().sidecar("mylux").unwrap().args([
-        "-o",
-        &download_dir,
-        // "--encoding=utf8"
-        &url,
+    let output = format!("{}/%(title)s.%(ext)s", download_dir);
+    let sidecar_command = app.shell().sidecar("my-yt-dlp").unwrap().args([
+        // "--proxy",
+        // "127.0.0.1:7890",
+        "-o", &output, &url,
     ]);
     let (mut _rx, mut _child) = sidecar_command.spawn().expect("Failed to spawn sidecar");
 
@@ -41,23 +40,36 @@ async fn download(url: &str, app: tauri::AppHandle) -> Result<(), String> {
             match event {
                 CommandEvent::Stdout(line) => {
                     // 处理标准输出
-                    let line_str = match str::from_utf8(&line) {
-                        Ok(v) => v,
-                        Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-                    };
-                    println!("Lux stdout: {}", line_str);
+                    // let line_str = match str::from_utf8(&line) {
+                    //     Ok(v) => v,
+                    //     Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+                    // };
+                    // println!("yt-dlp stdout: {}", line_str);
+                    let line_str = String::from_utf8_lossy(&line);
+                    println!("yt-dlp stdout: {}", line_str);
+
+                    // 发送实时输出到前端
+                    app.emit("yt-dlp-progress", line_str).unwrap();
                 }
                 CommandEvent::Stderr(line) => {
                     // 处理错误输出
-                    let line_str = match str::from_utf8(&line) {
-                        Ok(v) => v,
-                        Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-                    };
-                    eprintln!("Lux stderr: {}", line_str);
+                    // let line_str = match str::from_utf8(&line) {
+                    //     Ok(v) => v,
+                    //     Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+                    // };
+                    // eprintln!("yt-dlp stderr: {}", line_str);
+                    let line_str = String::from_utf8_lossy(&line);
+                    eprintln!("yt-dlp stderr: {}", line_str);
+
+                    // 发送错误信息到前端
+                    app.emit("yt-dlp-error", line_str).unwrap();
                 }
                 CommandEvent::Error(err) => {
                     // 处理错误
-                    eprintln!("Lux error: {}", err);
+                    eprintln!("yt-dlp error: {}", err);
+
+                    // 发送错误信息到前端
+                    app.emit("yt-dlp-error", err.to_string()).unwrap();
                 }
                 _ => {}
             }
