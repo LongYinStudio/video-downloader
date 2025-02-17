@@ -1,28 +1,67 @@
 <script setup>
-import { ref } from "vue";
+// import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { ref, onMounted, onUnmounted } from "vue";
+// import { setTheme } from "@tauri-apps/api/app";
 
 const url = ref("");
 const msg = ref("");
+const progress = ref("");
+const error = ref("");
 // const chooseDir = ref("");
 
 // async function dir() {
 //   alert(1);
 // }
 async function download() {
-  //测试 https://www.bilibili.com/video/BV1i7411F7NJ
+  // 测试 https://www.bilibili.com/video/BV1i7411F7NJ
   // msg.value = await invoke("download", { url: url.value });
   try {
     const result = await invoke("download", { url: url.value });
+    // await setTheme("dark");
     console.log(result);
-    msg.value = result;
   } catch (error) {
-    console.error("Failed to run Lux:", error);
+    // console.error("Failed to run Lux:", error);
+    console.error("Failed to run yt-dlp:", error);
+    error.value = "下载失败：" + err.message;
   }
   // const luxCommand = Command.sidecar("bin/mylux");
   // const output = await luxCommand.execute();
   // console.log(output.stdout);
 }
+
+// 监听下载进度
+let unlistenProgress;
+let unlistenError;
+
+onMounted(() => {
+  // 监听下载进度事件
+  unlistenProgress = listen("yt-dlp-progress", (event) => {
+    const output = event.payload;
+    console.log("Download progress:", output);
+
+    // 解析进度信息
+    const progressMatch = output.match(/\[download\]\s+(\d+\.?\d*)%/);
+    if (progressMatch) {
+      progress.value = `下载进度：${parseFloat(progressMatch[1]).toFixed(2)}%`;
+    } else {
+      progress.value = output; // 显示其他输出
+    }
+  });
+
+  // 监听错误事件
+  unlistenError = listen("yt-dlp-error", (event) => {
+    console.error("Download error:", event.payload);
+    error.value = "错误：" + event.payload;
+  });
+});
+
+onUnmounted(() => {
+  // 清理事件监听器
+  if (unlistenProgress) unlistenProgress.then((unlisten) => unlisten());
+  if (unlistenError) unlistenError.then((unlisten) => unlisten());
+});
 </script>
 
 <template>
@@ -31,7 +70,13 @@ async function download() {
       <img src="../src-tauri/icons/logo.png" class="logo" alt="logo" />
     </div>
     <h1>视频下载器</h1>
-    <p>显示信息:{{ msg }}</p>
+    <p>显示信息</p>
+    <div v-if="progress">
+      <p>{{ progress }}</p>
+    </div>
+    <div v-if="error">
+      <p style="color: red">{{ error }}</p>
+    </div>
     <!-- <p>目录:{{ msg }}</p> -->
     <!-- <button @click="dir">选择目录</button> -->
     <form class="row" @submit.prevent="download">
@@ -125,6 +170,7 @@ button {
 button:hover {
   border-color: #396cd8;
 }
+
 button:active {
   border-color: #396cd8;
   background-color: #e8e8e8;
@@ -154,6 +200,7 @@ button {
     color: #ffffff;
     background-color: #0f0f0f98;
   }
+
   button:active {
     background-color: #0f0f0f69;
   }

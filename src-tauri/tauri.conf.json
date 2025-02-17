@@ -49,7 +49,7 @@
       "icons/512x512.icns",
       "icons/512x512.ico"
     ],
-    "externalBin": ["bin/mylux"],
+    "externalBin": ["bin/my-yt-dlp"],
     "windows": {
       "wix": {
         "language": "zh-CN"
