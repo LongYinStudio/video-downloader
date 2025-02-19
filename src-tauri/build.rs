@@ -17,6 +17,20 @@ fn download_yt_dlp() -> Result<(), Box<dyn std::error::Error>> {
     let bin_dir = PathBuf::from("bin");
     fs::create_dir_all(&bin_dir).context("Failed to create bin directory")?;
 
+    let macos_targets = if cfg!(target_os = "macos") {
+        vec![
+            (
+                "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
+                "my-yt-dlp-aarch64-apple-darwin",
+            ),
+            (
+                "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
+                "my-yt-dlp-x86_64-apple-darwin",
+            ),
+        ]
+    } else {
+        vec![]
+    };
     // 根据平台选择下载地址
     let (url, filename) = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("windows", _) => (
@@ -38,14 +52,7 @@ fn download_yt_dlp() -> Result<(), Box<dyn std::error::Error>> {
         //     "my-yt-dlp-universal-apple-darwin",
         //     // "my-yt-dlp",
         // ),
-        ("macos", _) => (
-            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
-            "my-yt-dlp-aarch64-apple-darwin",
-        ),
-        ("macos", _) => (
-            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
-            "my-yt-dlp-x86_64-apple-darwin",
-        ),
+        ("macos", _) => macos_targets,
         (os, arch) => return Err(anyhow::anyhow!("Unsupported platform: {}-{}", os, arch).into()),
         // _ => return Err(format!("Unsupported platform: {}", std::env::consts::OS).into()),
     };
