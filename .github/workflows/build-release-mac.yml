@@ -66,9 +66,9 @@ jobs:
       # 构建 Tauri 应用
       - name: Build Tauri app
         run: |
-          # pnpm run tauri build --target aarch64-apple-darwin
+          pnpm run tauri build --target aarch64-apple-darwin
           # pnpm run tauri build --target x86_64-apple-darwin
-          pnpm run tauri build --target universal-apple-darwin
+          # pnpm run tauri build --target universal-apple-darwin
 
           # # 合并为 Universal Binary
           # lipo -create \
@@ -88,4 +88,4 @@ jobs:
         with:
           name: tauri-build-macos
           path: |
-            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app/
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app/
