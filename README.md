@@ -24,6 +24,10 @@
     </div>
 </div>
 
+## 截图
+
+![截图](./public/2025-02-22_18-58.png)
+
 ## 依赖
 
 - 确保 [ffmpeg](https://ffmpeg.org/download.html) 在系统上安装并配置好环境变量。

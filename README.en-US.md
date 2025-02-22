@@ -24,6 +24,10 @@
     </div>
 </div>
 
+## Screenshots
+
+![Screenshot1](./public/2025-02-22_18-58.png)
+
 ## depends
 
 - Make sure [ffmpeg](https://ffmpeg.org/download.html) is in your system path.

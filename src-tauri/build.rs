@@ -8,7 +8,7 @@ use std::time::Duration;
 
 fn main() {
     // 下载慢，开代理，再运行，但是事后必须关闭代理，不上会导致白屏
-    download_yt_dlp();
+    download_yt_dlp().expect("Failed to download yt-dlp");
     tauri_build::build();
 }
 
@@ -22,22 +22,19 @@ fn download_yt_dlp() -> Result<(), Box<dyn std::error::Error>> {
         ("windows", _) => (
             "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
             "my-yt-dlp-x86_64-pc-windows-msvc.exe",
-            // "my-yt-dlp.exe",
         ),
         ("linux", "x86_64") => (
             "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
             "my-yt-dlp-x86_64-unknown-linux-gnu",
-            // "my-yt-dlp",
         ),
         // ("linux", "aarch64") => (
         //     "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64",
-        //     "my-yt-dlp",
+        //     "my-yt-dlp-aarch64-unknown-linux-gnu",
         // ),
         ("macos", _) => (
             "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
             // "my-yt-dlp-universal-apple-darwin",
             "my-yt-dlp-aarch64-apple-darwin",
-            // "my-yt-dlp",
         ),
         (os, arch) => return Err(anyhow::anyhow!("Unsupported platform: {}-{}", os, arch).into()),
         // _ => return Err(format!("Unsupported platform: {}", std::env::consts::OS).into()),

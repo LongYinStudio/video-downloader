@@ -18,21 +18,38 @@ fn get_download_dir() -> Result<String, String> {
     Ok(download_dir.to_str().unwrap().to_string())
 }
 
+// 测试
+// 国内：https://www.bilibili.com/video/BV1GzfUYmEGE
+// 国外：https://www.youtube.com/watch?v=ObEN8jqJZ7o
 #[tauri::command]
-async fn download(url: &str, app: tauri::AppHandle) -> Result<(), String> {
-    println!("{}", url);
+async fn download(url: &str, dir: &str, proxy: &str, app: tauri::AppHandle) -> Result<(), String> {
     // 获取系统下载目录
-    let download_dir = get_download_dir()?;
+    let default_download_dir = get_download_dir()?;
+    // 如果用户指定了目录，则使用用户选择的目录；否则使用默认下载目录
+    let download_dir = if !dir.is_empty() {
+        dir.to_string()
+    } else {
+        default_download_dir
+    };
     println!("Download directory: {}", download_dir);
-
-    // `sidecar()` 只需要文件名, 不像 JavaScript 中的整个路径
-    // format!("下载地址 url:{}", url);
     let output = format!("{}/%(title)s.%(ext)s", download_dir);
-    let sidecar_command = app.shell().sidecar("my-yt-dlp").unwrap().args([
-        // "--proxy",
-        // "127.0.0.1:7890",
-        "-o", &output, &url,
-    ]);
+
+    // 设置代理
+    // if !proxy.is_empty() {
+    //     println!("有代理{}", proxy.to_string());
+    // } else {
+    //     println!("无代理");
+    // }
+    let mut args = vec!["-o", &output, &url];
+    if !proxy.is_empty() {
+        args.insert(0, "--proxy");
+        args.insert(1, &proxy);
+    }
+
+    let args_string = args.join(" ");
+    println!("完整命令：yt-dlp {}", args_string);
+    // `sidecar()` 只需要文件名, 不像 JavaScript 中的整个路径
+    let sidecar_command = app.shell().sidecar("my-yt-dlp").unwrap().args(&args);
     let (mut _rx, mut _child) = sidecar_command.spawn().expect("Failed to spawn sidecar");
 
     tauri::async_runtime::spawn(async move {
@@ -85,6 +102,7 @@ async fn download(url: &str, app: tauri::AppHandle) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![download])
         .run(tauri::generate_context!())
