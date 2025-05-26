@@ -26,7 +26,8 @@
 
 ## Screenshots
 
-![Screenshot1](./public/2025-02-22_18-58.png)
+![Screenshot1](./public/2025-05-26_08-01.png)
+![Screenshot2](./public/2025-05-26_08-03.png)
 
 ## depends
 

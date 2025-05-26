@@ -124,3 +124,7 @@ fn verify_yt_dlp(path: &PathBuf) -> Result<()> {
         anyhow::bail!("yt-dlp validation failed: {}", error)
     }
 }
+
+// fn check_ffmpeg() -> bool {
+//     Command::new("ffmpeg").arg("-version").output().is_ok()
+// }
