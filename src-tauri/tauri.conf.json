@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": ["deb", "rpm", "nsis", "app"],
+    "resources": ["icons/icon.png"],
     "icon": [
       "icons/icon.png",
       "icons/icon.icns",

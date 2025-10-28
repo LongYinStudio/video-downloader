@@ -4,3 +4,6 @@
 > debtap 转换 deb 需修改的地方
 > gtk 改成 gtk3
 > webkit2gtk-4.1-imgpaste 改成 webkit2gtk-4.1
+
+- [] 集成pinia
+- [] 集成ffmpeg
