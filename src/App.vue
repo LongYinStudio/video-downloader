@@ -3,6 +3,18 @@ import { ref } from "vue";
 import { Menu as IconMenu, Setting, InfoFilled } from "@element-plus/icons-vue";
 
 const isCollapse = ref(true);
+const THEME_KEY = "vd.theme";
+
+function applyTheme(mode) {
+  const root = document.documentElement;
+  if (!mode || mode === "system") {
+    root.removeAttribute("data-theme");
+    return;
+  }
+  root.setAttribute("data-theme", mode);
+}
+
+applyTheme(localStorage.getItem(THEME_KEY) || "system");
 const handleOpen = (key, keyPath) => {
   console.log(key, keyPath);
 };
@@ -110,6 +122,49 @@ const handleClose = (key, keyPath) => {
     --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
   }
+}
+
+/* 主题强制覆盖（不跟随系统） */
+:root[data-theme="light"] {
+  --bg-primary: #f6f6f6;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8eaed;
+
+  --text-primary: #0f0f0f;
+  --text-secondary: #424242;
+  --text-tertiary: #757575;
+
+  --border-color: #d0d0d0;
+  --hover-bg: #d3d6db;
+
+  --scrollbar-track: #f1f1f1;
+  --scrollbar-thumb: #c1c1c1;
+  --scrollbar-thumb-hover: #a8a8a8;
+
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+:root[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #363636;
+
+  --text-primary: #f6f6f6;
+  --text-secondary: #e0e0e0;
+  --text-tertiary: #b0b0b0;
+
+  --border-color: #424242;
+  --hover-bg: #4a4a4a;
+
+  --scrollbar-track: #2d2d2d;
+  --scrollbar-thumb: #555555;
+  --scrollbar-thumb-hover: #666666;
+
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
 }
 
 * {
