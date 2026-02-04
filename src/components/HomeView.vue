@@ -4,7 +4,13 @@ import { listen } from "@tauri-apps/api/event";
 import { ref, onMounted, onUnmounted } from "vue";
 // import { setTheme } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-dialog";
-import { QuestionFilled } from "@element-plus/icons-vue";
+import {
+  QuestionFilled,
+  Loading,
+  CircleCheck,
+  CircleClose,
+  VideoCamera,
+} from "@element-plus/icons-vue";
 import { version } from "../utils.js";
 
 const url = ref("");
@@ -12,6 +18,22 @@ const progress = ref("");
 const error = ref("");
 const dir = ref("");
 const proxy = ref("");
+const isDownloading = ref(false);
+const downloadStatus = ref("idle"); // idle, downloading, completed, failed
+const fileName = ref("");
+const downloadSpeed = ref("");
+
+// 表单引用
+const formRef = ref(null);
+
+// URL 验证规则
+const urlRules = {
+  required: true,
+  message: "请输入视频链接",
+  trigger: "blur",
+  pattern: /^https?:\/\/.+/,
+  patternMessage: "请输入有效的 URL（以 http:// 或 https:// 开头）",
+};
 
 async function chooseDir() {
   const selected = await open({
@@ -30,22 +52,43 @@ async function chooseDir() {
 async function download() {
   // 国内 测试：https://www.bilibili.com/video/BV1GzfUYmEGE
   // 国外 测试：https://www.youtube.com/watch?v=ObEN8jqJZ7o
+
+  // 验证 URL
+  if (!url.value.trim()) {
+    error.value = "请输入视频链接";
+    downloadStatus.value = "failed";
+    return;
+  }
+
+  // 验证 URL 格式
+  const urlPattern = /^https?:\/\/.+/;
+  if (!urlPattern.test(url.value.trim())) {
+    error.value = "请输入有效的 URL（以 http:// 或 https:// 开头）";
+    downloadStatus.value = "failed";
+    return;
+  }
+
+  // 重置状态
+  progress.value = "";
+  error.value = "";
+  isDownloading.value = true;
+  downloadStatus.value = "downloading";
+
   try {
     const result = await invoke("download", {
       url: url.value,
       dir: dir.value,
       proxy: proxy.value,
     });
-    // await setTheme("dark");
     console.log(result);
-  } catch (error) {
-    // console.error("Failed to run Lux:", error);
-    console.error("Failed to run yt-dlp:", error);
+    downloadStatus.value = "completed";
+  } catch (err) {
+    console.error("Failed to run yt-dlp:", err);
     error.value = "下载失败：" + err.message;
+    downloadStatus.value = "failed";
+  } finally {
+    isDownloading.value = false;
   }
-  // const luxCommand = Command.sidecar("bin/mylux");
-  // const output = await luxCommand.execute();
-  // console.log(output.stdout);
 }
 
 // 监听下载进度
@@ -89,64 +132,134 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div style="margin-top: 2em">
+  <div class="logo-container">
     <img src="../../src-tauri/icons/logo.png" class="logo" alt="logo" />
   </div>
   <h1 class="appname">
     视频下载器
-    <el-tag type="info" effect="dark" round> {{ version }}</el-tag>
+    <el-tag type="primary" effect="dark" round>{{ version }}</el-tag>
   </h1>
 
-  <el-card style="width: 96%; margin: 0 auto">
+  <el-card class="main-card" shadow="hover">
+    <!-- 下载状态提示 -->
+    <div v-if="downloadStatus !== 'idle'" class="status-bar">
+      <el-tag
+        v-if="downloadStatus === 'downloading'"
+        type="primary"
+        effect="plain"
+      >
+        <el-icon class="is-loading"><Loading /></el-icon>
+        下载中...
+      </el-tag>
+      <el-tag
+        v-else-if="downloadStatus === 'completed'"
+        type="success"
+        effect="plain"
+      >
+        <el-icon><CircleCheck /></el-icon>
+        下载完成
+      </el-tag>
+      <el-tag
+        v-else-if="downloadStatus === 'failed'"
+        type="danger"
+        effect="plain"
+      >
+        <el-icon><CircleClose /></el-icon>
+        下载失败
+      </el-tag>
+    </div>
+
     <el-form id="downloadForm" @submit.prevent="download">
-      <el-input id="url-input" v-model="url" placeholder="Enter a url..." />
-      <el-button @click="download()">开始下载</el-button>
+      <el-input
+        id="url-input"
+        v-model="url"
+        placeholder="请输入视频链接，支持 Bilibili、YouTube 等"
+        size="large"
+        clearable
+        :disabled="isDownloading"
+        show-word-limit
+        maxlength="500"
+      >
+        <template #prefix>
+          <el-icon><VideoCamera /></el-icon>
+        </template>
+      </el-input>
+      <el-tooltip
+        content="支持 YouTube、Bilibili、Vimeo 等主流视频平台"
+        placement="top"
+        :disabled="url.trim()"
+      >
+        <el-button
+          type="primary"
+          size="large"
+          :loading="isDownloading"
+          :disabled="isDownloading || !url.trim()"
+          @click="download()"
+        >
+          {{ isDownloading ? "下载中..." : "开始下载" }}
+        </el-button>
+      </el-tooltip>
     </el-form>
     <el-progress
       id="progress"
-      v-if="process"
+      v-if="progress"
       :text-inside="true"
       :stroke-width="24"
-      :percentage="progress"
+      :percentage="parseFloat(progress)"
       status="success"
     />
-    <div v-if="error" style="margin-top: 1em">
-      <p style="color: red">下载出错：{{ error }}</p>
+    <div v-if="error" class="error-message">
+      <el-alert type="error" :closable="true" show-icon @close="error = ''">
+        <template #title>
+          {{ error }}
+        </template>
+        <template #default>
+          <div class="error-tips">
+            请检查：
+            <ul>
+              <li>URL 是否正确（以 http:// 或 https:// 开头）</li>
+              <li>网络连接是否正常</li>
+              <li>视频链接是否有效</li>
+              <li>代理设置是否正确（如需使用代理）</li>
+            </ul>
+          </div>
+        </template>
+      </el-alert>
     </div>
     <el-divider />
     <div class="conf">
       <div class="confItem">
-        <el-text class="label">保存目录:</el-text>
+        <el-text class="label" tag="b">保存目录</el-text>
         <div class="confContent">
           <el-input
             id="dir-input"
             v-model="dir"
             placeholder="未选择目录(默认：系统Downloads目录)"
+            readonly
           />
-          <el-button @click="chooseDir()">选择目录</el-button>
+          <el-button type="info" @click="chooseDir()">选择目录</el-button>
         </div>
       </div>
-      <div class="confItem" style="padding-top: 1em">
-        <el-text class="label">代理设置:</el-text>
+      <div class="confItem">
+        <el-text class="label" tag="b">代理设置</el-text>
         <div class="confContent">
           <el-input
             id="proxy-input"
             v-model="proxy"
-            placeholder="Enter a proxy..."
+            placeholder="可选：http://127.0.0.1:7890"
           />
           <el-tooltip
-            content="举例：[http|socks5://]127.0.0.1:7890，具体地址、端口查看代理软件"
+            content="支持 HTTP/SOCKS5 代理，如：http://127.0.0.1:7890"
             placement="top"
           >
-            <el-icon><QuestionFilled /></el-icon>
+            <el-icon class="help-icon"><QuestionFilled /></el-icon>
           </el-tooltip>
         </div>
       </div>
     </div>
   </el-card>
 
-  <footer>
-    <!-- <p>默认下载路径：系统Downloads目录</p> -->
+  <footer class="footer">
     <p>
       © 2025 by
       <a target="_blank" href="https://github.com/LongYinStudio"
@@ -157,80 +270,166 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.logo-container {
+  margin-top: 2.5em;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .logo {
-  height: 6em;
-  will-change: filter;
-  transition: 0.75s;
-  border-radius: 1em;
+  height: 7em;
+  width: 7em;
+  border-radius: 1.5em;
+  transition: all 0.4s ease;
+  box-shadow: var(--shadow-md);
+  object-fit: cover;
 }
 
 .logo:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-lg);
   filter: drop-shadow(0 0 2em #030040);
 }
 
 .appname {
-  padding: 0.8em 0px;
+  padding: 1em 0;
+  font-size: 2em;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  color: var(--text-primary);
 }
 
 h1 {
   text-align: center;
+  margin: 0;
+}
+
+.main-card {
+  width: 90%;
+  max-width: 700px;
+  margin: 1.5em auto;
+  border-radius: 12px;
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.status-bar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1em;
+}
+
+.status-bar .el-tag {
+  font-size: 1em;
+  padding: 0.5em 1em;
 }
 
 #progress {
-  padding: 2em 0px;
-  width: 66%;
+  padding: 2.5em 0;
+  width: 70%;
   margin: 0 auto;
 }
 
 #downloadForm {
   display: grid;
-  grid-template-columns: 1fr 10em;
+  grid-template-columns: 1fr 12em;
   grid-gap: 1em;
 }
+
 #downloadForm > * {
-  height: 3.4em;
+  height: 3.6em;
+  font-size: 1em;
 }
 
-.conf .confItem .label {
-  text-align: start;
+.error-message {
+  margin-top: 1.5em;
+}
+
+.error-tips {
+  margin-top: 0.5em;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+
+.error-tips ul {
+  margin-left: 1.2em;
+  margin-top: 0.3em;
+}
+
+.error-tips li {
+  margin: 0.3em 0;
+}
+
+.conf {
+  margin-top: 1.5em;
+}
+
+.confItem {
+  margin-bottom: 1.2em;
+}
+
+.conf .label {
+  display: block;
+  text-align: left;
+  margin-bottom: 0.5em;
+  font-size: 0.95em;
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 .confContent {
   display: grid;
-  grid-template-columns: 20em 4.8em;
-  grid-gap: 0.5em;
+  grid-template-columns: 1fr auto;
+  grid-gap: 0.75em;
   align-items: center;
-  padding-top: 0.3em;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-
-  button:active {
-    background-color: #0f0f0f69;
-  }
+.help-icon {
+  cursor: help;
+  font-size: 1.2em;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
 }
 
-footer {
-  /* position: fixed; */
-  /* bottom: 10px; */
+.help-icon:hover {
+  color: var(--primary-color);
+}
+
+.footer {
   width: 100%;
   text-align: center;
-  padding: 10px;
-  background-color: #f6f6f6;
-  color: #0f0f0f;
+  padding: 1.5em 1em;
+  color: var(--text-tertiary);
+  font-size: 0.9em;
+}
+
+.footer a {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.footer a:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+/* 深色模式特定调整 */
+@media (prefers-color-scheme: dark) {
+  .logo {
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+  }
+
+  .logo:hover {
+    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
+  }
+
+  .main-card {
+    box-shadow: var(--shadow-lg);
+  }
 }
 </style>
