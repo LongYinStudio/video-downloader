@@ -1,9 +1,11 @@
 <script setup>
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 // import { setTheme } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-dialog";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { downloadDir } from "@tauri-apps/api/path";
 import {
   QuestionFilled,
   Loading,
@@ -22,6 +24,12 @@ const isDownloading = ref(false);
 const downloadStatus = ref("idle"); // idle, downloading, completed, failed
 const fileName = ref("");
 const downloadSpeed = ref("");
+
+const DIR_KEY = "vd.dir";
+const PROXY_KEY = "vd.proxy";
+const AUTO_OPEN_DIR_KEY = "vd.auto_open_dir";
+const AUTO_PASTE_CLIPBOARD_KEY = "vd.auto_paste_clipboard";
+const URL_PATTERN = /^https?:\/\/.+/;
 
 // 表单引用
 const formRef = ref(null);
@@ -61,8 +69,7 @@ async function download() {
   }
 
   // 验证 URL 格式
-  const urlPattern = /^https?:\/\/.+/;
-  if (!urlPattern.test(url.value.trim())) {
+  if (!URL_PATTERN.test(url.value.trim())) {
     error.value = "请输入有效的 URL（以 http:// 或 https:// 开头）";
     downloadStatus.value = "failed";
     return;
@@ -82,6 +89,22 @@ async function download() {
     });
     console.log(result);
     downloadStatus.value = "completed";
+    const autoOpenDir = localStorage.getItem(AUTO_OPEN_DIR_KEY) !== "false";
+    if (autoOpenDir) {
+      let targetDir = dir.value;
+      if (!targetDir) {
+        try {
+          targetDir = await downloadDir();
+        } catch (dirErr) {
+          console.warn("Resolve downloadDir failed:", dirErr);
+        }
+      }
+      try {
+        if (targetDir) await openPath(targetDir);
+      } catch (openErr) {
+        console.warn("Open directory failed:", openErr);
+      }
+    }
   } catch (err) {
     console.error("Failed to run yt-dlp:", err);
     error.value = "下载失败：" + err.message;
@@ -96,6 +119,25 @@ let onListenProgress;
 let onListenError;
 
 onMounted(() => {
+  const savedDir = localStorage.getItem(DIR_KEY);
+  if (savedDir) dir.value = savedDir;
+  const savedProxy = localStorage.getItem(PROXY_KEY);
+  if (savedProxy) proxy.value = savedProxy;
+  const autoPaste =
+    localStorage.getItem(AUTO_PASTE_CLIPBOARD_KEY) === "true";
+  if (autoPaste && !url.value) {
+    navigator.clipboard
+      ?.readText?.()
+      .then((text) => {
+        if (text && URL_PATTERN.test(text.trim())) {
+          url.value = text.trim();
+        }
+      })
+      .catch(() => {
+        // ignore clipboard errors
+      });
+  }
+
   // 监听下载进度事件
   onListenProgress = listen("yt-dlp-progress", (event) => {
     const output = event.payload;
@@ -122,6 +164,22 @@ onMounted(() => {
       error.value = event.payload;
     }
   });
+});
+
+watch(dir, (val) => {
+  if (!val) {
+    localStorage.removeItem(DIR_KEY);
+    return;
+  }
+  localStorage.setItem(DIR_KEY, val);
+});
+
+watch(proxy, (val) => {
+  if (!val) {
+    localStorage.removeItem(PROXY_KEY);
+    return;
+  }
+  localStorage.setItem(PROXY_KEY, val);
 });
 
 onUnmounted(() => {
