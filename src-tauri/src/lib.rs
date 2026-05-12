@@ -116,6 +116,7 @@ async fn download(
     let concurrent_fragments = validate_number(concurrent_fragments, 1, 16, "并发片段数")?;
 
     let mut args = get_format_args(format_preset)?;
+    args.push("--newline".to_string());
     args.push("--retries".to_string());
     args.push(retries.to_string());
     args.push("--fragment-retries".to_string());

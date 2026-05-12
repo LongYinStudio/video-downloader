@@ -10,7 +10,6 @@ import {
   Loading,
   CircleCheck,
   CircleClose,
-  VideoCamera,
 } from "@element-plus/icons-vue";
 import { version } from "../utils.js";
 import {
@@ -25,6 +24,11 @@ import {
 const url = ref("");
 const progress = ref("");
 const error = ref("");
+const currentFile = ref("");
+const downloadSpeed = ref("");
+const eta = ref("");
+const queueIndex = ref(0);
+const queueTotal = ref(0);
 const dir = ref("");
 const proxy = ref("");
 const formatPreset = ref(DEFAULT_DOWNLOAD_OPTIONS.format);
@@ -42,6 +46,49 @@ function getErrorMessage(err) {
   return err?.message || String(err);
 }
 
+function getUrls() {
+  return url.value
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function resetDownloadDetails() {
+  progress.value = "";
+  currentFile.value = "";
+  downloadSpeed.value = "";
+  eta.value = "";
+}
+
+function parseProgressOutput(output) {
+  const destinationMatch =
+    output.match(/\[download\]\s+Destination:\s+(.+)/) ||
+    output.match(/\[ExtractAudio\]\s+Destination:\s+(.+)/) ||
+    output.match(/\[Merger\]\s+Merging formats into "(.+)"/);
+  if (destinationMatch) {
+    currentFile.value = destinationMatch[1].trim();
+  }
+
+  const alreadyDownloadedMatch = output.match(
+    /\[download\]\s+(.+)\s+has already been downloaded/,
+  );
+  if (alreadyDownloadedMatch) {
+    currentFile.value = alreadyDownloadedMatch[1].trim();
+    progress.value = "100.00";
+  }
+
+  const progressMatch = output.match(/\[download\]\s+(\d+\.?\d*)%/);
+  if (progressMatch) {
+    progress.value = parseFloat(progressMatch[1]).toFixed(2);
+  }
+
+  const speedEtaMatch = output.match(/\bat\s+([^\s]+\/s)\s+ETA\s+([^\s]+)/);
+  if (speedEtaMatch) {
+    downloadSpeed.value = speedEtaMatch[1];
+    eta.value = speedEtaMatch[2];
+  }
+}
+
 async function chooseDir() {
   const selected = await open({
     directory: true,
@@ -54,33 +101,42 @@ async function chooseDir() {
   }
 }
 async function download() {
-  if (!url.value.trim()) {
+  const urls = getUrls();
+  if (!urls.length) {
     error.value = "请输入视频链接";
     downloadStatus.value = "failed";
     return;
   }
 
-  if (!URL_PATTERN.test(url.value.trim())) {
-    error.value = "请输入有效的 URL（以 http:// 或 https:// 开头）";
+  const invalidUrl = urls.find((item) => !URL_PATTERN.test(item));
+  if (invalidUrl) {
+    error.value = `请输入有效的 URL：${invalidUrl}`;
     downloadStatus.value = "failed";
     return;
   }
 
-  progress.value = "";
+  resetDownloadDetails();
   error.value = "";
   isDownloading.value = true;
   downloadStatus.value = "downloading";
+  queueTotal.value = urls.length;
 
   try {
-    await invoke("download", {
-      url: url.value,
-      dir: dir.value,
-      proxy: proxy.value,
-      formatPreset: formatPreset.value,
-      filenameTemplate: filenameTemplate.value,
-      retries: retries.value,
-      concurrentFragments: concurrentFragments.value,
-    });
+    for (const [index, item] of urls.entries()) {
+      queueIndex.value = index + 1;
+      resetDownloadDetails();
+
+      await invoke("download", {
+        url: item,
+        dir: dir.value,
+        proxy: proxy.value,
+        formatPreset: formatPreset.value,
+        filenameTemplate: filenameTemplate.value,
+        retries: retries.value,
+        concurrentFragments: concurrentFragments.value,
+      });
+    }
+
     downloadStatus.value = "completed";
     const autoOpenDir = localStorage.getItem(STORAGE_KEYS.autoOpenDir) !== "false";
     if (autoOpenDir) {
@@ -110,6 +166,8 @@ async function download() {
   } finally {
     isDownloading.value = false;
     isCancelling.value = false;
+    queueIndex.value = 0;
+    queueTotal.value = 0;
   }
 }
 
@@ -172,11 +230,7 @@ onMounted(() => {
   }
 
   onListenProgress = listen("yt-dlp-progress", (event) => {
-    const output = event.payload;
-    const progressMatch = output.match(/\[download\]\s+(\d+\.?\d*)%/);
-    if (progressMatch) {
-      progress.value = parseFloat(progressMatch[1]).toFixed(2);
-    }
+    parseProgressOutput(event.payload);
   });
 
   onListenError = listen("yt-dlp-error", (event) => {
@@ -280,17 +334,15 @@ onUnmounted(() => {
       <el-input
         id="url-input"
         v-model="url"
-        placeholder="请输入视频链接，支持 Bilibili、YouTube 等"
+        type="textarea"
+        placeholder="请输入视频链接，支持 Bilibili、YouTube 等；多个链接可每行一个"
         size="large"
         clearable
         :disabled="isDownloading"
         show-word-limit
-        maxlength="500"
-      >
-        <template #prefix>
-          <el-icon><VideoCamera /></el-icon>
-        </template>
-      </el-input>
+        maxlength="4000"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+      />
       <el-tooltip
         content="支持 YouTube、Bilibili、Vimeo 等主流视频平台"
         placement="top"
@@ -327,6 +379,29 @@ onUnmounted(() => {
       :percentage="parseFloat(progress)"
       status="success"
     />
+    <div
+      v-if="isDownloading || currentFile || downloadSpeed || eta"
+      class="download-details"
+    >
+      <div v-if="queueTotal > 1" class="detail-row">
+        <span class="detail-label">队列</span>
+        <span>{{ queueIndex }} / {{ queueTotal }}</span>
+      </div>
+      <div v-if="currentFile" class="detail-row">
+        <span class="detail-label">文件</span>
+        <span class="detail-value">{{ currentFile }}</span>
+      </div>
+      <div v-if="downloadSpeed || eta" class="detail-grid">
+        <div class="detail-row">
+          <span class="detail-label">速度</span>
+          <span>{{ downloadSpeed || "-" }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">剩余</span>
+          <span>{{ eta || "-" }}</span>
+        </div>
+      </div>
+    </div>
     <div v-if="error" class="error-message">
       <el-alert type="error" :closable="true" show-icon @close="error = ''">
         <template #title>
@@ -520,7 +595,7 @@ h1 {
 }
 
 #progress {
-  padding: 2.5em 0;
+  padding: 2em 0 1em;
   width: 70%;
   margin: 0 auto;
 }
@@ -531,8 +606,8 @@ h1 {
   grid-gap: 1em;
 }
 
-#downloadForm > * {
-  height: 3.6em;
+#downloadForm > .download-actions {
+  min-height: 3.6em;
   font-size: 1em;
 }
 
@@ -546,6 +621,40 @@ h1 {
   height: 100%;
   min-width: 7.5em;
   margin-left: 0;
+}
+
+.download-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  margin: 1em auto 0;
+  width: 90%;
+  color: var(--text-secondary);
+  font-size: 0.92em;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75em;
+}
+
+.detail-row {
+  display: flex;
+  gap: 0.6em;
+  min-width: 0;
+}
+
+.detail-label {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+}
+
+.detail-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .error-message {
