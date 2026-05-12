@@ -5,12 +5,6 @@ import { ref, onMounted, onUnmounted, watch } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { downloadDir } from "@tauri-apps/api/path";
-import {
-  QuestionFilled,
-  Loading,
-  CircleCheck,
-  CircleClose,
-} from "@element-plus/icons-vue";
 import { version } from "../utils.js";
 import {
   DEFAULT_DOWNLOAD_OPTIONS,
@@ -20,6 +14,9 @@ import {
   readNumberSetting,
   readOptionSetting,
 } from "../settings.js";
+import DownloadForm from "./DownloadForm.vue";
+import DownloadOptions from "./DownloadOptions.vue";
+import DownloadProgress from "./DownloadProgress.vue";
 
 const url = ref("");
 const progress = ref("");
@@ -352,232 +349,37 @@ onUnmounted(() => {
     </h1>
 
     <el-card class="main-card" shadow="hover">
-    <!-- 下载状态提示 -->
-    <div v-if="downloadStatus !== 'idle'" class="status-bar">
-      <el-tag
-        v-if="downloadStatus === 'downloading'"
-        type="primary"
-        effect="plain"
-      >
-        <el-icon class="is-loading"><Loading /></el-icon>
-        下载中...
-      </el-tag>
-      <el-tag
-        v-else-if="downloadStatus === 'completed'"
-        type="success"
-        effect="plain"
-      >
-        <el-icon><CircleCheck /></el-icon>
-        下载完成
-      </el-tag>
-      <el-tag
-        v-else-if="downloadStatus === 'failed'"
-        type="danger"
-        effect="plain"
-      >
-        <el-icon><CircleClose /></el-icon>
-        下载失败
-      </el-tag>
-      <el-tag
-        v-else-if="downloadStatus === 'cancelled'"
-        type="warning"
-        effect="plain"
-      >
-        <el-icon><CircleClose /></el-icon>
-        已取消
-      </el-tag>
-    </div>
-
-    <el-form id="downloadForm" @submit.prevent="download">
-      <el-input
-        id="url-input"
-        v-model="url"
-        type="textarea"
-        placeholder="请输入视频链接，支持 Bilibili、YouTube 等；多个链接可每行一个"
-        size="large"
-        clearable
-        :disabled="isDownloading"
-        show-word-limit
-        maxlength="4000"
-        :autosize="{ minRows: 2, maxRows: 6 }"
+      <DownloadProgress
+        :download-status="downloadStatus"
+        :progress="progress"
+        :is-downloading="isDownloading"
+        :current-file="currentFile"
+        :download-speed="downloadSpeed"
+        :eta="eta"
+        :queue-index="queueIndex"
+        :queue-total="queueTotal"
+        :error="error"
+        :error-tips="errorTips"
+        @clear-error="error = ''"
       />
-      <el-tooltip
-        content="支持 YouTube、Bilibili、Vimeo 等主流视频平台"
-        placement="top"
-        :disabled="url.trim()"
-      >
-        <div class="download-actions">
-          <el-button
-            type="primary"
-            size="large"
-            :loading="isDownloading"
-            :disabled="isDownloading || !url.trim()"
-            @click="download()"
-          >
-            {{ isDownloading ? "下载中..." : "开始下载" }}
-          </el-button>
-          <el-button
-            v-if="isDownloading"
-            type="danger"
-            size="large"
-            plain
-            :loading="isCancelling"
-            @click="cancelDownload()"
-          >
-            取消
-          </el-button>
-        </div>
-      </el-tooltip>
-    </el-form>
-    <el-progress
-      id="progress"
-      v-if="progress"
-      :text-inside="true"
-      :stroke-width="24"
-      :percentage="parseFloat(progress)"
-      status="success"
-    />
-    <div
-      v-if="isDownloading || currentFile || downloadSpeed || eta"
-      class="download-details"
-    >
-      <div v-if="queueTotal > 1" class="detail-row">
-        <span class="detail-label">队列</span>
-        <span>{{ queueIndex }} / {{ queueTotal }}</span>
-      </div>
-      <div v-if="currentFile" class="detail-row">
-        <span class="detail-label">文件</span>
-        <span class="detail-value">{{ currentFile }}</span>
-      </div>
-      <div v-if="downloadSpeed || eta" class="detail-grid">
-        <div class="detail-row">
-          <span class="detail-label">速度</span>
-          <span>{{ downloadSpeed || "-" }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">剩余</span>
-          <span>{{ eta || "-" }}</span>
-        </div>
-      </div>
-    </div>
-    <div v-if="error" class="error-message">
-      <el-alert type="error" :closable="true" show-icon @close="error = ''">
-        <template #title>
-          {{ error }}
-        </template>
-        <template #default>
-          <div v-if="errorTips.length" class="error-tips">
-            请检查：
-            <ul>
-              <li v-for="tip in errorTips" :key="tip">{{ tip }}</li>
-            </ul>
-          </div>
-        </template>
-      </el-alert>
-    </div>
-    <el-divider />
-    <div class="conf">
-      <div class="confItem">
-        <el-text class="label" tag="b">保存目录</el-text>
-        <div class="confContent">
-          <el-input
-            id="dir-input"
-            v-model="dir"
-            placeholder="未选择目录(默认：系统Downloads目录)"
-            readonly
-            :disabled="isDownloading"
-          />
-          <el-button type="info" :disabled="isDownloading" @click="chooseDir()"
-            >选择目录</el-button
-          >
-        </div>
-      </div>
-      <div class="confItem">
-        <el-text class="label" tag="b">下载格式</el-text>
-        <div class="confContent">
-          <el-select
-            v-model="formatPreset"
-            placeholder="选择下载格式"
-            :disabled="isDownloading"
-          >
-            <el-option
-              v-for="item in FORMAT_OPTIONS"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </el-select>
-          <el-tooltip
-            content="指定最高分辨率或仅下载音频；MP3 需要 FFmpeg 支持"
-            placement="top"
-          >
-            <el-icon class="help-icon"><QuestionFilled /></el-icon>
-          </el-tooltip>
-        </div>
-      </div>
-      <div class="confItem">
-        <el-text class="label" tag="b">文件名模板</el-text>
-        <div class="confContent">
-          <el-select
-            v-model="filenameTemplate"
-            placeholder="选择文件名模板"
-            :disabled="isDownloading"
-          >
-            <el-option
-              v-for="item in FILENAME_TEMPLATE_OPTIONS"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </el-select>
-          <el-tooltip content="控制保存文件名的组成方式" placement="top">
-            <el-icon class="help-icon"><QuestionFilled /></el-icon>
-          </el-tooltip>
-        </div>
-      </div>
-      <div class="confItem">
-        <el-text class="label" tag="b">下载参数</el-text>
-        <div class="confContent compact">
-          <div class="number-field">
-            <el-text size="small">重试次数</el-text>
-            <el-input-number
-              v-model="retries"
-              :min="0"
-              :max="20"
-              :disabled="isDownloading"
-              controls-position="right"
-            />
-          </div>
-          <div class="number-field">
-            <el-text size="small">并发片段</el-text>
-            <el-input-number
-              v-model="concurrentFragments"
-              :min="1"
-              :max="16"
-              :disabled="isDownloading"
-              controls-position="right"
-            />
-          </div>
-        </div>
-      </div>
-      <div class="confItem">
-        <el-text class="label" tag="b">代理设置</el-text>
-        <div class="confContent">
-          <el-input
-            id="proxy-input"
-            v-model="proxy"
-            placeholder="可选：http://127.0.0.1:7890"
-            :disabled="isDownloading"
-          />
-          <el-tooltip
-            content="支持 HTTP/SOCKS5 代理，如：http://127.0.0.1:7890"
-            placement="top"
-          >
-            <el-icon class="help-icon"><QuestionFilled /></el-icon>
-          </el-tooltip>
-        </div>
-      </div>
-    </div>
+      <DownloadForm
+        v-model:url="url"
+        :is-downloading="isDownloading"
+        :is-cancelling="isCancelling"
+        @download="download"
+        @cancel="cancelDownload"
+      />
+      <el-divider />
+      <DownloadOptions
+        v-model:dir="dir"
+        v-model:format-preset="formatPreset"
+        v-model:filename-template="filenameTemplate"
+        v-model:retries="retries"
+        v-model:concurrent-fragments="concurrentFragments"
+        v-model:proxy="proxy"
+        :is-downloading="isDownloading"
+        @choose-dir="chooseDir"
+      />
     </el-card>
 
     <footer class="footer">
@@ -645,149 +447,6 @@ h1 {
   border-color: var(--border-color);
 }
 
-.status-bar {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1em;
-}
-
-.status-bar .el-tag {
-  font-size: 1em;
-  padding: 0.5em 1em;
-}
-
-#progress {
-  padding: 2em 0 1em;
-  width: 70%;
-  margin: 0 auto;
-}
-
-#downloadForm {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-gap: 1em;
-}
-
-#downloadForm > .download-actions {
-  min-height: 3.6em;
-  font-size: 1em;
-}
-
-.download-actions {
-  display: flex;
-  gap: 0.75em;
-  height: 100%;
-}
-
-.download-actions .el-button {
-  height: 100%;
-  min-width: 7.5em;
-  margin-left: 0;
-}
-
-.download-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6em;
-  margin: 1em auto 0;
-  width: 90%;
-  color: var(--text-secondary);
-  font-size: 0.92em;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75em;
-}
-
-.detail-row {
-  display: flex;
-  gap: 0.6em;
-  min-width: 0;
-}
-
-.detail-label {
-  flex: 0 0 auto;
-  color: var(--text-tertiary);
-}
-
-.detail-value {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.error-message {
-  margin-top: 1.5em;
-}
-
-.error-tips {
-  margin-top: 0.5em;
-  font-size: 0.9em;
-  color: var(--text-secondary);
-}
-
-.error-tips ul {
-  margin-left: 1.2em;
-  margin-top: 0.3em;
-}
-
-.error-tips li {
-  margin: 0.3em 0;
-}
-
-.conf {
-  margin-top: 1.5em;
-}
-
-.confItem {
-  margin-bottom: 1.2em;
-}
-
-.conf .label {
-  display: block;
-  text-align: left;
-  margin-bottom: 0.5em;
-  font-size: 0.95em;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.confContent {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-gap: 0.75em;
-  align-items: center;
-}
-
-.confContent.compact {
-  grid-template-columns: repeat(2, minmax(8em, 1fr));
-}
-
-.number-field {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.5em;
-  align-items: center;
-}
-
-.number-field .el-input-number {
-  width: 100%;
-}
-
-.help-icon {
-  cursor: help;
-  font-size: 1.2em;
-  color: var(--text-tertiary);
-  transition: color 0.3s ease;
-}
-
-.help-icon:hover {
-  color: var(--primary-color);
-}
-
 .footer {
   width: 100%;
   text-align: center;
@@ -828,32 +487,6 @@ h1 {
     margin: 0.75em auto;
   }
 
-  #downloadForm {
-    grid-template-columns: 1fr;
-  }
-
-  .download-actions {
-    width: 100%;
-  }
-
-  .download-actions .el-button {
-    flex: 1;
-    min-width: 0;
-  }
-
-  #progress,
-  .download-details {
-    width: 100%;
-  }
-
-  .confContent,
-  .confContent.compact {
-    grid-template-columns: 1fr;
-  }
-
-  .number-field {
-    grid-template-columns: 5em 1fr;
-  }
 }
 
 /* 深色模式特定调整 */
