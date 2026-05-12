@@ -24,6 +24,7 @@ import {
 const url = ref("");
 const progress = ref("");
 const error = ref("");
+const errorTips = ref([]);
 const currentFile = ref("");
 const downloadSpeed = ref("");
 const eta = ref("");
@@ -44,6 +45,58 @@ const URL_PATTERN = /^https?:\/\/.+/;
 function getErrorMessage(err) {
   if (typeof err === "string") return err;
   return err?.message || String(err);
+}
+
+function getDownloadError(message) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("ffmpeg")) {
+    return {
+      message: "FFmpeg 不可用，无法完成合并或音频转换",
+      tips: ["安装 FFmpeg", "确认 ffmpeg 已加入系统 PATH", "如不需要转换，可改用普通视频格式"],
+    };
+  }
+  if (
+    normalized.includes("proxy") ||
+    normalized.includes("connection refused") ||
+    normalized.includes("failed to establish")
+  ) {
+    return {
+      message: "网络或代理连接失败",
+      tips: ["检查网络连接", "确认代理地址和端口可用", "不需要代理时清空代理设置"],
+    };
+  }
+  if (
+    normalized.includes("private video") ||
+    normalized.includes("sign in") ||
+    normalized.includes("login required") ||
+    normalized.includes("forbidden")
+  ) {
+    return {
+      message: "视频需要登录或没有访问权限",
+      tips: ["确认链接可在浏览器中打开", "检查视频是否为私密或会员内容", "后续可通过 Cookies 支持处理登录内容"],
+    };
+  }
+  if (
+    normalized.includes("unsupported url") ||
+    normalized.includes("not a valid url") ||
+    normalized.includes("no video formats found")
+  ) {
+    return {
+      message: "视频链接无效或当前站点不受支持",
+      tips: ["确认 URL 以 http:// 或 https:// 开头", "检查链接是否完整", "尝试在浏览器中打开该链接"],
+    };
+  }
+
+  return {
+    message,
+    tips: ["URL 是否正确", "网络连接是否正常", "视频链接是否有效", "代理设置是否正确"],
+  };
+}
+
+function setDownloadError(rawMessage) {
+  const formatted = getDownloadError(rawMessage);
+  error.value = `下载失败：${formatted.message}`;
+  errorTips.value = formatted.tips;
 }
 
 function getUrls() {
@@ -117,6 +170,7 @@ async function download() {
 
   resetDownloadDetails();
   error.value = "";
+  errorTips.value = [];
   isDownloading.value = true;
   downloadStatus.value = "downloading";
   queueTotal.value = urls.length;
@@ -158,9 +212,10 @@ async function download() {
     const message = getErrorMessage(err);
     if (message === "下载已取消") {
       error.value = "";
+      errorTips.value = [];
       downloadStatus.value = "cancelled";
     } else {
-      error.value = "下载失败：" + message;
+      setDownloadError(message);
       downloadStatus.value = "failed";
     }
   } finally {
@@ -178,7 +233,7 @@ async function cancelDownload() {
   try {
     await invoke("cancel_download");
   } catch (err) {
-    error.value = getErrorMessage(err);
+    setDownloadError(getErrorMessage(err));
     isCancelling.value = false;
   }
 }
@@ -236,9 +291,9 @@ onMounted(() => {
   onListenError = listen("yt-dlp-error", (event) => {
     const urlERROR = event.payload.match(/'([^']*)' is not a valid URL\./);
     if (urlERROR) {
-      error.value = urlERROR[0] + "请输入正确url地址";
+      setDownloadError(urlERROR[0]);
     } else {
-      error.value = event.payload;
+      setDownloadError(event.payload);
     }
   });
 });
@@ -408,13 +463,10 @@ onUnmounted(() => {
           {{ error }}
         </template>
         <template #default>
-          <div class="error-tips">
+          <div v-if="errorTips.length" class="error-tips">
             请检查：
             <ul>
-              <li>URL 是否正确（以 http:// 或 https:// 开头）</li>
-              <li>网络连接是否正常</li>
-              <li>视频链接是否有效</li>
-              <li>代理设置是否正确（如需使用代理）</li>
+              <li v-for="tip in errorTips" :key="tip">{{ tip }}</li>
             </ul>
           </div>
         </template>
