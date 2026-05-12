@@ -57,6 +57,26 @@ fn get_format_args(format_preset: &str) -> Result<Vec<String>, String> {
     Ok(args)
 }
 
+fn get_output_template(download_dir: &str, filename_template: &str) -> Result<String, String> {
+    let filename = match filename_template {
+        "" | "title" => "%(title)s.%(ext)s",
+        "title_id" => "%(title)s [%(id)s].%(ext)s",
+        "uploader_title" => "%(uploader)s - %(title)s.%(ext)s",
+        "date_title" => "%(upload_date)s - %(title)s.%(ext)s",
+        _ => return Err("不支持的文件名模板".to_string()),
+    };
+
+    Ok(format!("{}/{}", download_dir, filename))
+}
+
+fn validate_number(value: i32, min: i32, max: i32, field: &str) -> Result<i32, String> {
+    if (min..=max).contains(&value) {
+        Ok(value)
+    } else {
+        Err(format!("{}必须在 {} 到 {} 之间", field, min, max))
+    }
+}
+
 // 测试
 // 国内：https://www.bilibili.com/video/BV1GzfUYmEGE
 // 国外：https://www.youtube.com/watch?v=ObEN8jqJZ7o
@@ -66,6 +86,9 @@ async fn download(
     dir: &str,
     proxy: &str,
     format_preset: &str,
+    filename_template: &str,
+    retries: i32,
+    concurrent_fragments: i32,
     app: tauri::AppHandle,
     state: tauri::State<'_, DownloadState>,
 ) -> Result<(), String> {
@@ -88,9 +111,17 @@ async fn download(
         default_download_dir
     };
     println!("Download directory: {}", download_dir);
-    let output = format!("{}/%(title)s.%(ext)s", download_dir);
+    let output = get_output_template(&download_dir, filename_template)?;
+    let retries = validate_number(retries, 0, 20, "重试次数")?;
+    let concurrent_fragments = validate_number(concurrent_fragments, 1, 16, "并发片段数")?;
 
     let mut args = get_format_args(format_preset)?;
+    args.push("--retries".to_string());
+    args.push(retries.to_string());
+    args.push("--fragment-retries".to_string());
+    args.push(retries.to_string());
+    args.push("-N".to_string());
+    args.push(concurrent_fragments.to_string());
 
     // 设置代理
     // if !proxy.is_empty() {

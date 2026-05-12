@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from "vue";
 import { Menu as IconMenu, Setting, InfoFilled } from "@element-plus/icons-vue";
+import { STORAGE_KEYS } from "./settings.js";
 
 const isCollapse = ref(true);
-const THEME_KEY = "vd.theme";
 
 function applyTheme(mode) {
   const root = document.documentElement;
@@ -14,13 +14,7 @@ function applyTheme(mode) {
   root.setAttribute("data-theme", mode);
 }
 
-applyTheme(localStorage.getItem(THEME_KEY) || "system");
-const handleOpen = (key, keyPath) => {
-  console.log(key, keyPath);
-};
-const handleClose = (key, keyPath) => {
-  console.log(key, keyPath);
-};
+applyTheme(localStorage.getItem(STORAGE_KEYS.theme) || "system");
 </script>
 
 <template>
@@ -30,8 +24,6 @@ const handleClose = (key, keyPath) => {
       class="sideBar"
       :collapse="isCollapse"
       :collapse-transition="true"
-      @open="handleOpen"
-      @close="handleClose"
       router="true"
     >
       <el-menu-item index="/">

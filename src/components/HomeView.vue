@@ -2,7 +2,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ref, onMounted, onUnmounted, watch } from "vue";
-// import { setTheme } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { downloadDir } from "@tauri-apps/api/path";
@@ -14,115 +13,92 @@ import {
   VideoCamera,
 } from "@element-plus/icons-vue";
 import { version } from "../utils.js";
+import {
+  DEFAULT_DOWNLOAD_OPTIONS,
+  FILENAME_TEMPLATE_OPTIONS,
+  FORMAT_OPTIONS,
+  STORAGE_KEYS,
+  readNumberSetting,
+  readOptionSetting,
+} from "../settings.js";
 
 const url = ref("");
 const progress = ref("");
 const error = ref("");
 const dir = ref("");
 const proxy = ref("");
-const formatPreset = ref("best");
+const formatPreset = ref(DEFAULT_DOWNLOAD_OPTIONS.format);
+const filenameTemplate = ref(DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate);
+const retries = ref(DEFAULT_DOWNLOAD_OPTIONS.retries);
+const concurrentFragments = ref(DEFAULT_DOWNLOAD_OPTIONS.concurrentFragments);
 const isDownloading = ref(false);
 const isCancelling = ref(false);
 const downloadStatus = ref("idle"); // idle, downloading, completed, failed, cancelled
-const fileName = ref("");
-const downloadSpeed = ref("");
 
-const DIR_KEY = "vd.dir";
-const PROXY_KEY = "vd.proxy";
-const FORMAT_KEY = "vd.format";
-const AUTO_OPEN_DIR_KEY = "vd.auto_open_dir";
-const AUTO_PASTE_CLIPBOARD_KEY = "vd.auto_paste_clipboard";
 const URL_PATTERN = /^https?:\/\/.+/;
-const FORMAT_OPTIONS = [
-  { label: "最佳画质", value: "best" },
-  { label: "最高 1080p", value: "1080p" },
-  { label: "最高 720p", value: "720p" },
-  { label: "最高 480p", value: "480p" },
-  { label: "仅音频 MP3", value: "audio" },
-];
-
-// 表单引用
-const formRef = ref(null);
 
 function getErrorMessage(err) {
   if (typeof err === "string") return err;
   return err?.message || String(err);
 }
 
-// URL 验证规则
-const urlRules = {
-  required: true,
-  message: "请输入视频链接",
-  trigger: "blur",
-  pattern: /^https?:\/\/.+/,
-  patternMessage: "请输入有效的 URL（以 http:// 或 https:// 开头）",
-};
-
 async function chooseDir() {
   const selected = await open({
-    directory: true, // 设置为 true 表示选择目录
-    multiple: false, // 是否允许多选
-    title: "选择目录", // 对话框标题
+    directory: true,
+    multiple: false,
+    title: "选择目录",
   });
 
   if (selected) {
     dir.value = selected;
-    console.log("选择的目录:", selected);
-  } else {
-    console.log("用户取消了选择");
   }
 }
 async function download() {
-  // 国内 测试：https://www.bilibili.com/video/BV1GzfUYmEGE
-  // 国外 测试：https://www.youtube.com/watch?v=ObEN8jqJZ7o
-
-  // 验证 URL
   if (!url.value.trim()) {
     error.value = "请输入视频链接";
     downloadStatus.value = "failed";
     return;
   }
 
-  // 验证 URL 格式
   if (!URL_PATTERN.test(url.value.trim())) {
     error.value = "请输入有效的 URL（以 http:// 或 https:// 开头）";
     downloadStatus.value = "failed";
     return;
   }
 
-  // 重置状态
   progress.value = "";
   error.value = "";
   isDownloading.value = true;
   downloadStatus.value = "downloading";
 
   try {
-    const result = await invoke("download", {
+    await invoke("download", {
       url: url.value,
       dir: dir.value,
       proxy: proxy.value,
       formatPreset: formatPreset.value,
+      filenameTemplate: filenameTemplate.value,
+      retries: retries.value,
+      concurrentFragments: concurrentFragments.value,
     });
-    console.log(result);
     downloadStatus.value = "completed";
-    const autoOpenDir = localStorage.getItem(AUTO_OPEN_DIR_KEY) !== "false";
+    const autoOpenDir = localStorage.getItem(STORAGE_KEYS.autoOpenDir) !== "false";
     if (autoOpenDir) {
       let targetDir = dir.value;
       if (!targetDir) {
         try {
           targetDir = await downloadDir();
         } catch (dirErr) {
-          console.warn("Resolve downloadDir failed:", dirErr);
+          error.value = getErrorMessage(dirErr);
         }
       }
       try {
         if (targetDir) await openPath(targetDir);
       } catch (openErr) {
-        console.warn("Open directory failed:", openErr);
+        error.value = getErrorMessage(openErr);
       }
     }
   } catch (err) {
-    console.error("Failed to run yt-dlp:", err);
     const message = getErrorMessage(err);
     if (message === "下载已取消") {
       error.value = "";
@@ -154,14 +130,34 @@ let onListenProgress;
 let onListenError;
 
 onMounted(() => {
-  const savedDir = localStorage.getItem(DIR_KEY);
+  const savedDir = localStorage.getItem(STORAGE_KEYS.dir);
   if (savedDir) dir.value = savedDir;
-  const savedProxy = localStorage.getItem(PROXY_KEY);
+  const savedProxy = localStorage.getItem(STORAGE_KEYS.proxy);
   if (savedProxy) proxy.value = savedProxy;
-  const savedFormat = localStorage.getItem(FORMAT_KEY);
-  if (savedFormat) formatPreset.value = savedFormat;
+  formatPreset.value = readOptionSetting(
+    STORAGE_KEYS.format,
+    FORMAT_OPTIONS,
+    DEFAULT_DOWNLOAD_OPTIONS.format,
+  );
+  filenameTemplate.value = readOptionSetting(
+    STORAGE_KEYS.filenameTemplate,
+    FILENAME_TEMPLATE_OPTIONS,
+    DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate,
+  );
+  retries.value = readNumberSetting(
+    STORAGE_KEYS.retries,
+    DEFAULT_DOWNLOAD_OPTIONS.retries,
+    0,
+    20,
+  );
+  concurrentFragments.value = readNumberSetting(
+    STORAGE_KEYS.concurrentFragments,
+    DEFAULT_DOWNLOAD_OPTIONS.concurrentFragments,
+    1,
+    16,
+  );
   const autoPaste =
-    localStorage.getItem(AUTO_PASTE_CLIPBOARD_KEY) === "true";
+    localStorage.getItem(STORAGE_KEYS.autoPasteClipboard) === "true";
   if (autoPaste && !url.value) {
     navigator.clipboard
       ?.readText?.()
@@ -175,25 +171,15 @@ onMounted(() => {
       });
   }
 
-  // 监听下载进度事件
   onListenProgress = listen("yt-dlp-progress", (event) => {
     const output = event.payload;
-    console.log("Download progress:", output);
-
-    // 解析进度信息
     const progressMatch = output.match(/\[download\]\s+(\d+\.?\d*)%/);
     if (progressMatch) {
-      // progress.value = `下载进度：${parseFloat(progressMatch[1]).toFixed(2)}%`;
       progress.value = parseFloat(progressMatch[1]).toFixed(2);
     }
-    // else {
-    //   progress.value = output; // 显示其他输出
-    // }
   });
 
-  // 监听错误事件
   onListenError = listen("yt-dlp-error", (event) => {
-    console.error("Download error:", event.payload);
     const urlERROR = event.payload.match(/'([^']*)' is not a valid URL\./);
     if (urlERROR) {
       error.value = urlERROR[0] + "请输入正确url地址";
@@ -205,26 +191,40 @@ onMounted(() => {
 
 watch(dir, (val) => {
   if (!val) {
-    localStorage.removeItem(DIR_KEY);
+    localStorage.removeItem(STORAGE_KEYS.dir);
     return;
   }
-  localStorage.setItem(DIR_KEY, val);
+  localStorage.setItem(STORAGE_KEYS.dir, val);
 });
 
 watch(proxy, (val) => {
   if (!val) {
-    localStorage.removeItem(PROXY_KEY);
+    localStorage.removeItem(STORAGE_KEYS.proxy);
     return;
   }
-  localStorage.setItem(PROXY_KEY, val);
+  localStorage.setItem(STORAGE_KEYS.proxy, val);
 });
 
 watch(formatPreset, (val) => {
-  localStorage.setItem(FORMAT_KEY, val || "best");
+  localStorage.setItem(STORAGE_KEYS.format, val || DEFAULT_DOWNLOAD_OPTIONS.format);
+});
+
+watch(filenameTemplate, (val) => {
+  localStorage.setItem(
+    STORAGE_KEYS.filenameTemplate,
+    val || DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate,
+  );
+});
+
+watch(retries, (val) => {
+  localStorage.setItem(STORAGE_KEYS.retries, String(val));
+});
+
+watch(concurrentFragments, (val) => {
+  localStorage.setItem(STORAGE_KEYS.concurrentFragments, String(val));
 });
 
 onUnmounted(() => {
-  // 清理事件监听器
   if (onListenProgress) onListenProgress.then((onListen) => onListen());
   if (onListenError) onListenError.then((onListen) => onListen());
 });
@@ -386,6 +386,51 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="confItem">
+        <el-text class="label" tag="b">文件名模板</el-text>
+        <div class="confContent">
+          <el-select
+            v-model="filenameTemplate"
+            placeholder="选择文件名模板"
+            :disabled="isDownloading"
+          >
+            <el-option
+              v-for="item in FILENAME_TEMPLATE_OPTIONS"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-tooltip content="控制保存文件名的组成方式" placement="top">
+            <el-icon class="help-icon"><QuestionFilled /></el-icon>
+          </el-tooltip>
+        </div>
+      </div>
+      <div class="confItem">
+        <el-text class="label" tag="b">下载参数</el-text>
+        <div class="confContent compact">
+          <div class="number-field">
+            <el-text size="small">重试次数</el-text>
+            <el-input-number
+              v-model="retries"
+              :min="0"
+              :max="20"
+              :disabled="isDownloading"
+              controls-position="right"
+            />
+          </div>
+          <div class="number-field">
+            <el-text size="small">并发片段</el-text>
+            <el-input-number
+              v-model="concurrentFragments"
+              :min="1"
+              :max="16"
+              :disabled="isDownloading"
+              controls-position="right"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="confItem">
         <el-text class="label" tag="b">代理设置</el-text>
         <div class="confContent">
           <el-input
@@ -544,6 +589,21 @@ h1 {
   grid-template-columns: 1fr auto;
   grid-gap: 0.75em;
   align-items: center;
+}
+
+.confContent.compact {
+  grid-template-columns: repeat(2, minmax(8em, 1fr));
+}
+
+.number-field {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5em;
+  align-items: center;
+}
+
+.number-field .el-input-number {
+  width: 100%;
 }
 
 .help-icon {

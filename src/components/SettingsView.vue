@@ -1,25 +1,22 @@
 <script setup>
 import { onMounted, ref, watch } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
-
-const THEME_KEY = "vd.theme";
-const DIR_KEY = "vd.dir";
-const PROXY_KEY = "vd.proxy";
-const FORMAT_KEY = "vd.format";
-const AUTO_OPEN_DIR_KEY = "vd.auto_open_dir";
-const AUTO_PASTE_CLIPBOARD_KEY = "vd.auto_paste_clipboard";
-const FORMAT_OPTIONS = [
-  { label: "最佳画质", value: "best" },
-  { label: "最高 1080p", value: "1080p" },
-  { label: "最高 720p", value: "720p" },
-  { label: "最高 480p", value: "480p" },
-  { label: "仅音频 MP3", value: "audio" },
-];
+import {
+  DEFAULT_DOWNLOAD_OPTIONS,
+  FILENAME_TEMPLATE_OPTIONS,
+  FORMAT_OPTIONS,
+  STORAGE_KEYS,
+  readNumberSetting,
+  readOptionSetting,
+} from "../settings.js";
 
 const themeMode = ref("system");
 const defaultDir = ref("");
 const defaultProxy = ref("");
-const defaultFormat = ref("best");
+const defaultFormat = ref(DEFAULT_DOWNLOAD_OPTIONS.format);
+const defaultFilenameTemplate = ref(DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate);
+const defaultRetries = ref(DEFAULT_DOWNLOAD_OPTIONS.retries);
+const defaultConcurrentFragments = ref(DEFAULT_DOWNLOAD_OPTIONS.concurrentFragments);
 const autoOpenDir = ref(true);
 const autoPasteClipboard = ref(false);
 
@@ -33,47 +30,83 @@ function applyTheme(mode) {
 }
 
 onMounted(() => {
-  themeMode.value = localStorage.getItem(THEME_KEY) || "system";
-  defaultDir.value = localStorage.getItem(DIR_KEY) || "";
-  defaultProxy.value = localStorage.getItem(PROXY_KEY) || "";
-  defaultFormat.value = localStorage.getItem(FORMAT_KEY) || "best";
-  autoOpenDir.value = localStorage.getItem(AUTO_OPEN_DIR_KEY) !== "false";
+  themeMode.value = localStorage.getItem(STORAGE_KEYS.theme) || "system";
+  defaultDir.value = localStorage.getItem(STORAGE_KEYS.dir) || "";
+  defaultProxy.value = localStorage.getItem(STORAGE_KEYS.proxy) || "";
+  defaultFormat.value = readOptionSetting(
+    STORAGE_KEYS.format,
+    FORMAT_OPTIONS,
+    DEFAULT_DOWNLOAD_OPTIONS.format,
+  );
+  defaultFilenameTemplate.value = readOptionSetting(
+    STORAGE_KEYS.filenameTemplate,
+    FILENAME_TEMPLATE_OPTIONS,
+    DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate,
+  );
+  defaultRetries.value = readNumberSetting(
+    STORAGE_KEYS.retries,
+    DEFAULT_DOWNLOAD_OPTIONS.retries,
+    0,
+    20,
+  );
+  defaultConcurrentFragments.value = readNumberSetting(
+    STORAGE_KEYS.concurrentFragments,
+    DEFAULT_DOWNLOAD_OPTIONS.concurrentFragments,
+    1,
+    16,
+  );
+  autoOpenDir.value = localStorage.getItem(STORAGE_KEYS.autoOpenDir) !== "false";
   autoPasteClipboard.value =
-    localStorage.getItem(AUTO_PASTE_CLIPBOARD_KEY) === "true";
+    localStorage.getItem(STORAGE_KEYS.autoPasteClipboard) === "true";
   applyTheme(themeMode.value);
 });
 
 watch(themeMode, (val) => {
-  localStorage.setItem(THEME_KEY, val);
+  localStorage.setItem(STORAGE_KEYS.theme, val);
   applyTheme(val);
 });
 
 watch(defaultDir, (val) => {
   if (!val) {
-    localStorage.removeItem(DIR_KEY);
+    localStorage.removeItem(STORAGE_KEYS.dir);
     return;
   }
-  localStorage.setItem(DIR_KEY, val);
+  localStorage.setItem(STORAGE_KEYS.dir, val);
 });
 
 watch(defaultProxy, (val) => {
   if (!val) {
-    localStorage.removeItem(PROXY_KEY);
+    localStorage.removeItem(STORAGE_KEYS.proxy);
     return;
   }
-  localStorage.setItem(PROXY_KEY, val);
+  localStorage.setItem(STORAGE_KEYS.proxy, val);
 });
 
 watch(defaultFormat, (val) => {
-  localStorage.setItem(FORMAT_KEY, val || "best");
+  localStorage.setItem(STORAGE_KEYS.format, val || DEFAULT_DOWNLOAD_OPTIONS.format);
+});
+
+watch(defaultFilenameTemplate, (val) => {
+  localStorage.setItem(
+    STORAGE_KEYS.filenameTemplate,
+    val || DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate,
+  );
+});
+
+watch(defaultRetries, (val) => {
+  localStorage.setItem(STORAGE_KEYS.retries, String(val));
+});
+
+watch(defaultConcurrentFragments, (val) => {
+  localStorage.setItem(STORAGE_KEYS.concurrentFragments, String(val));
 });
 
 watch(autoOpenDir, (val) => {
-  localStorage.setItem(AUTO_OPEN_DIR_KEY, String(val));
+  localStorage.setItem(STORAGE_KEYS.autoOpenDir, String(val));
 });
 
 watch(autoPasteClipboard, (val) => {
-  localStorage.setItem(AUTO_PASTE_CLIPBOARD_KEY, String(val));
+  localStorage.setItem(STORAGE_KEYS.autoPasteClipboard, String(val));
 });
 
 async function chooseDir() {
@@ -96,15 +129,21 @@ function resetAll() {
   themeMode.value = "system";
   defaultDir.value = "";
   defaultProxy.value = "";
-  defaultFormat.value = "best";
+  defaultFormat.value = DEFAULT_DOWNLOAD_OPTIONS.format;
+  defaultFilenameTemplate.value = DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate;
+  defaultRetries.value = DEFAULT_DOWNLOAD_OPTIONS.retries;
+  defaultConcurrentFragments.value = DEFAULT_DOWNLOAD_OPTIONS.concurrentFragments;
   autoOpenDir.value = true;
   autoPasteClipboard.value = false;
-  localStorage.removeItem(THEME_KEY);
-  localStorage.removeItem(DIR_KEY);
-  localStorage.removeItem(PROXY_KEY);
-  localStorage.removeItem(FORMAT_KEY);
-  localStorage.removeItem(AUTO_OPEN_DIR_KEY);
-  localStorage.removeItem(AUTO_PASTE_CLIPBOARD_KEY);
+  localStorage.removeItem(STORAGE_KEYS.theme);
+  localStorage.removeItem(STORAGE_KEYS.dir);
+  localStorage.removeItem(STORAGE_KEYS.proxy);
+  localStorage.removeItem(STORAGE_KEYS.format);
+  localStorage.removeItem(STORAGE_KEYS.filenameTemplate);
+  localStorage.removeItem(STORAGE_KEYS.retries);
+  localStorage.removeItem(STORAGE_KEYS.concurrentFragments);
+  localStorage.removeItem(STORAGE_KEYS.autoOpenDir);
+  localStorage.removeItem(STORAGE_KEYS.autoPasteClipboard);
   applyTheme("system");
 }
 </script>
@@ -153,6 +192,49 @@ function resetAll() {
             </el-select>
           </div>
           <p class="hint">指定最高分辨率或仅下载音频；MP3 需要 FFmpeg 支持。</p>
+        </div>
+
+        <div class="field">
+          <el-text class="label" tag="b">文件名模板</el-text>
+          <div class="field-content single">
+            <el-select
+              v-model="defaultFilenameTemplate"
+              placeholder="选择文件名模板"
+            >
+              <el-option
+                v-for="item in FILENAME_TEMPLATE_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </div>
+          <p class="hint">控制保存文件名的组成方式。</p>
+        </div>
+
+        <div class="field">
+          <el-text class="label" tag="b">下载参数</el-text>
+          <div class="field-content numeric">
+            <div class="number-field">
+              <el-text size="small">重试次数</el-text>
+              <el-input-number
+                v-model="defaultRetries"
+                :min="0"
+                :max="20"
+                controls-position="right"
+              />
+            </div>
+            <div class="number-field">
+              <el-text size="small">并发片段</el-text>
+              <el-input-number
+                v-model="defaultConcurrentFragments"
+                :min="1"
+                :max="16"
+                controls-position="right"
+              />
+            </div>
+          </div>
+          <p class="hint">重试次数同时用于普通重试和分片重试。</p>
         </div>
 
         <div class="field">
@@ -249,6 +331,21 @@ function resetAll() {
 
 .field-content.single {
   grid-template-columns: 1fr;
+}
+
+.field-content.numeric {
+  grid-template-columns: repeat(2, minmax(10em, 1fr));
+}
+
+.number-field {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5em;
+  align-items: center;
+}
+
+.number-field .el-input-number {
+  width: 100%;
 }
 
 .label {
