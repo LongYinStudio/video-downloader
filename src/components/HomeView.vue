@@ -342,15 +342,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="logo-container">
-    <img src="../../src-tauri/icons/logo.png" class="logo" alt="logo" />
-  </div>
-  <h1 class="appname">
-    视频下载器
-    <el-tag type="primary" effect="dark" round>{{ version }}</el-tag>
-  </h1>
+  <div class="home-page">
+    <div class="logo-container">
+      <img src="../../src-tauri/icons/logo.png" class="logo" alt="logo" />
+    </div>
+    <h1 class="appname">
+      视频下载器
+      <el-tag type="primary" effect="dark" round>{{ version }}</el-tag>
+    </h1>
 
-  <el-card class="main-card" shadow="hover">
+    <el-card class="main-card" shadow="hover">
     <!-- 下载状态提示 -->
     <div v-if="downloadStatus !== 'idle'" class="status-bar">
       <el-tag
@@ -577,19 +578,26 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
-  </el-card>
+    </el-card>
 
-  <footer class="footer">
-    <p>
-      © 2025 by
-      <a target="_blank" href="https://github.com/LongYinStudio"
-        >LongYinStudio</a
-      >
-    </p>
-  </footer>
+    <footer class="footer">
+      <p>
+        © 2025 by
+        <a target="_blank" href="https://github.com/LongYinStudio"
+          >LongYinStudio</a
+        >
+      </p>
+    </footer>
+  </div>
 </template>
 
 <style scoped>
+.home-page {
+  width: 100%;
+  min-width: 0;
+  padding-bottom: 2rem;
+}
+
 .logo-container {
   margin-top: 2.5em;
   display: flex;
@@ -629,7 +637,7 @@ h1 {
 }
 
 .main-card {
-  width: 90%;
+  width: min(90%, 700px);
   max-width: 700px;
   margin: 1.5em auto;
   border-radius: 12px;
@@ -797,6 +805,55 @@ h1 {
 .footer a:hover {
   color: var(--primary-hover);
   text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .logo-container {
+    margin-top: 1.2em;
+  }
+
+  .logo {
+    width: 5em;
+    height: 5em;
+    border-radius: 1.1em;
+  }
+
+  .appname {
+    padding: 0.8em 0;
+    font-size: 1.5em;
+  }
+
+  .main-card {
+    width: calc(100% - 1em);
+    margin: 0.75em auto;
+  }
+
+  #downloadForm {
+    grid-template-columns: 1fr;
+  }
+
+  .download-actions {
+    width: 100%;
+  }
+
+  .download-actions .el-button {
+    flex: 1;
+    min-width: 0;
+  }
+
+  #progress,
+  .download-details {
+    width: 100%;
+  }
+
+  .confContent,
+  .confContent.compact {
+    grid-template-columns: 1fr;
+  }
+
+  .number-field {
+    grid-template-columns: 5em 1fr;
+  }
 }
 
 /* 深色模式特定调整 */

@@ -185,7 +185,7 @@ applyTheme(localStorage.getItem(STORAGE_KEYS.theme) || "system");
   height: 100vh;
   width: 100vw;
   display: grid;
-  grid-template-columns: auto minmax(400px, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -305,9 +305,12 @@ applyTheme(localStorage.getItem(STORAGE_KEYS.theme) || "system");
 #main {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
   text-align: center;
   background: linear-gradient(
     135deg,
