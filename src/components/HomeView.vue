@@ -20,6 +20,7 @@ const progress = ref("");
 const error = ref("");
 const dir = ref("");
 const proxy = ref("");
+const formatPreset = ref("best");
 const isDownloading = ref(false);
 const isCancelling = ref(false);
 const downloadStatus = ref("idle"); // idle, downloading, completed, failed, cancelled
@@ -28,9 +29,17 @@ const downloadSpeed = ref("");
 
 const DIR_KEY = "vd.dir";
 const PROXY_KEY = "vd.proxy";
+const FORMAT_KEY = "vd.format";
 const AUTO_OPEN_DIR_KEY = "vd.auto_open_dir";
 const AUTO_PASTE_CLIPBOARD_KEY = "vd.auto_paste_clipboard";
 const URL_PATTERN = /^https?:\/\/.+/;
+const FORMAT_OPTIONS = [
+  { label: "最佳画质", value: "best" },
+  { label: "最高 1080p", value: "1080p" },
+  { label: "最高 720p", value: "720p" },
+  { label: "最高 480p", value: "480p" },
+  { label: "仅音频 MP3", value: "audio" },
+];
 
 // 表单引用
 const formRef = ref(null);
@@ -92,6 +101,7 @@ async function download() {
       url: url.value,
       dir: dir.value,
       proxy: proxy.value,
+      formatPreset: formatPreset.value,
     });
     console.log(result);
     downloadStatus.value = "completed";
@@ -148,6 +158,8 @@ onMounted(() => {
   if (savedDir) dir.value = savedDir;
   const savedProxy = localStorage.getItem(PROXY_KEY);
   if (savedProxy) proxy.value = savedProxy;
+  const savedFormat = localStorage.getItem(FORMAT_KEY);
+  if (savedFormat) formatPreset.value = savedFormat;
   const autoPaste =
     localStorage.getItem(AUTO_PASTE_CLIPBOARD_KEY) === "true";
   if (autoPaste && !url.value) {
@@ -205,6 +217,10 @@ watch(proxy, (val) => {
     return;
   }
   localStorage.setItem(PROXY_KEY, val);
+});
+
+watch(formatPreset, (val) => {
+  localStorage.setItem(FORMAT_KEY, val || "best");
 });
 
 onUnmounted(() => {
@@ -344,6 +360,29 @@ onUnmounted(() => {
           <el-button type="info" :disabled="isDownloading" @click="chooseDir()"
             >选择目录</el-button
           >
+        </div>
+      </div>
+      <div class="confItem">
+        <el-text class="label" tag="b">下载格式</el-text>
+        <div class="confContent">
+          <el-select
+            v-model="formatPreset"
+            placeholder="选择下载格式"
+            :disabled="isDownloading"
+          >
+            <el-option
+              v-for="item in FORMAT_OPTIONS"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-tooltip
+            content="指定最高分辨率或仅下载音频；MP3 需要 FFmpeg 支持"
+            placement="top"
+          >
+            <el-icon class="help-icon"><QuestionFilled /></el-icon>
+          </el-tooltip>
         </div>
       </div>
       <div class="confItem">

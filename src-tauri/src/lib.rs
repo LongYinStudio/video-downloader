@@ -29,6 +29,34 @@ fn get_download_dir() -> Result<String, String> {
         .to_string())
 }
 
+fn get_format_args(format_preset: &str) -> Result<Vec<String>, String> {
+    let args = match format_preset {
+        "" | "best" => Vec::new(),
+        "1080p" => vec![
+            "-f".to_string(),
+            "bv*[height<=1080]+ba/b[height<=1080]/best[height<=1080]".to_string(),
+        ],
+        "720p" => vec![
+            "-f".to_string(),
+            "bv*[height<=720]+ba/b[height<=720]/best[height<=720]".to_string(),
+        ],
+        "480p" => vec![
+            "-f".to_string(),
+            "bv*[height<=480]+ba/b[height<=480]/best[height<=480]".to_string(),
+        ],
+        "audio" => vec![
+            "-x".to_string(),
+            "--audio-format".to_string(),
+            "mp3".to_string(),
+            "-f".to_string(),
+            "bestaudio/best".to_string(),
+        ],
+        _ => return Err("不支持的下载格式".to_string()),
+    };
+
+    Ok(args)
+}
+
 // 测试
 // 国内：https://www.bilibili.com/video/BV1GzfUYmEGE
 // 国外：https://www.youtube.com/watch?v=ObEN8jqJZ7o
@@ -37,6 +65,7 @@ async fn download(
     url: &str,
     dir: &str,
     proxy: &str,
+    format_preset: &str,
     app: tauri::AppHandle,
     state: tauri::State<'_, DownloadState>,
 ) -> Result<(), String> {
@@ -61,17 +90,21 @@ async fn download(
     println!("Download directory: {}", download_dir);
     let output = format!("{}/%(title)s.%(ext)s", download_dir);
 
+    let mut args = get_format_args(format_preset)?;
+
     // 设置代理
     // if !proxy.is_empty() {
     //     println!("有代理{}", proxy.to_string());
     // } else {
     //     println!("无代理");
     // }
-    let mut args = vec!["-o", &output, &url];
     if !proxy.is_empty() {
-        args.insert(0, "--proxy");
-        args.insert(1, &proxy);
+        args.push("--proxy".to_string());
+        args.push(proxy.to_string());
     }
+    args.push("-o".to_string());
+    args.push(output);
+    args.push(url.to_string());
 
     let args_string = args.join(" ");
     println!("完整命令：yt-dlp {}", args_string);
