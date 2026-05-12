@@ -8,6 +8,18 @@ use tauri::Emitter;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DownloadOptions {
+    url: String,
+    dir: String,
+    proxy: String,
+    format_preset: String,
+    filename_template: String,
+    retries: i32,
+    concurrent_fragments: i32,
+}
+
 #[derive(Default)]
 struct DownloadState {
     child: Mutex<Option<CommandChild>>,
@@ -77,18 +89,45 @@ fn validate_number(value: i32, min: i32, max: i32, field: &str) -> Result<i32, S
     }
 }
 
+fn build_download_args(options: &DownloadOptions) -> Result<Vec<String>, String> {
+    let default_download_dir = get_download_dir()?;
+    let download_dir = if !options.dir.is_empty() {
+        options.dir.clone()
+    } else {
+        default_download_dir
+    };
+    println!("Download directory: {}", download_dir);
+
+    let output = get_output_template(&download_dir, &options.filename_template)?;
+    let retries = validate_number(options.retries, 0, 20, "重试次数")?;
+    let concurrent_fragments = validate_number(options.concurrent_fragments, 1, 16, "并发片段数")?;
+
+    let mut args = get_format_args(&options.format_preset)?;
+    args.push("--newline".to_string());
+    args.push("--retries".to_string());
+    args.push(retries.to_string());
+    args.push("--fragment-retries".to_string());
+    args.push(retries.to_string());
+    args.push("-N".to_string());
+    args.push(concurrent_fragments.to_string());
+
+    if !options.proxy.is_empty() {
+        args.push("--proxy".to_string());
+        args.push(options.proxy.clone());
+    }
+    args.push("-o".to_string());
+    args.push(output);
+    args.push(options.url.clone());
+
+    Ok(args)
+}
+
 // 测试
 // 国内：https://www.bilibili.com/video/BV1GzfUYmEGE
 // 国外：https://www.youtube.com/watch?v=ObEN8jqJZ7o
 #[tauri::command]
 async fn download(
-    url: &str,
-    dir: &str,
-    proxy: &str,
-    format_preset: &str,
-    filename_template: &str,
-    retries: i32,
-    concurrent_fragments: i32,
+    options: DownloadOptions,
     app: tauri::AppHandle,
     state: tauri::State<'_, DownloadState>,
 ) -> Result<(), String> {
@@ -102,42 +141,7 @@ async fn download(
         }
     }
 
-    // 获取系统下载目录
-    let default_download_dir = get_download_dir()?;
-    // 如果用户指定了目录，则使用用户选择的目录；否则使用默认下载目录
-    let download_dir = if !dir.is_empty() {
-        dir.to_string()
-    } else {
-        default_download_dir
-    };
-    println!("Download directory: {}", download_dir);
-    let output = get_output_template(&download_dir, filename_template)?;
-    let retries = validate_number(retries, 0, 20, "重试次数")?;
-    let concurrent_fragments = validate_number(concurrent_fragments, 1, 16, "并发片段数")?;
-
-    let mut args = get_format_args(format_preset)?;
-    args.push("--newline".to_string());
-    args.push("--retries".to_string());
-    args.push(retries.to_string());
-    args.push("--fragment-retries".to_string());
-    args.push(retries.to_string());
-    args.push("-N".to_string());
-    args.push(concurrent_fragments.to_string());
-
-    // 设置代理
-    // if !proxy.is_empty() {
-    //     println!("有代理{}", proxy.to_string());
-    // } else {
-    //     println!("无代理");
-    // }
-    if !proxy.is_empty() {
-        args.push("--proxy".to_string());
-        args.push(proxy.to_string());
-    }
-    args.push("-o".to_string());
-    args.push(output);
-    args.push(url.to_string());
-
+    let args = build_download_args(&options)?;
     let args_string = args.join(" ");
     println!("完整命令：yt-dlp {}", args_string);
     // `sidecar()` 只需要文件名, 不像 JavaScript 中的整个路径

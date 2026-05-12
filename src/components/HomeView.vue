@@ -181,13 +181,15 @@ async function download() {
       resetDownloadDetails();
 
       await invoke("download", {
-        url: item,
-        dir: dir.value,
-        proxy: proxy.value,
-        formatPreset: formatPreset.value,
-        filenameTemplate: filenameTemplate.value,
-        retries: retries.value,
-        concurrentFragments: concurrentFragments.value,
+        options: {
+          url: item,
+          dir: dir.value,
+          proxy: proxy.value,
+          formatPreset: formatPreset.value,
+          filenameTemplate: filenameTemplate.value,
+          retries: retries.value,
+          concurrentFragments: concurrentFragments.value,
+        },
       });
     }
 
