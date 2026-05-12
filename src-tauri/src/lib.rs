@@ -1,8 +1,18 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use directories::UserDirs;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex,
+};
 use tauri::Emitter;
-use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+
+#[derive(Default)]
+struct DownloadState {
+    child: Mutex<Option<CommandChild>>,
+    cancelled: AtomicBool,
+}
 
 // 定义一个名为 get_download_dir 的函数，该函数返回一个 Result 类型，其中包含一个 String 或一个 String 错误信息
 fn get_download_dir() -> Result<String, String> {
@@ -23,7 +33,23 @@ fn get_download_dir() -> Result<String, String> {
 // 国内：https://www.bilibili.com/video/BV1GzfUYmEGE
 // 国外：https://www.youtube.com/watch?v=ObEN8jqJZ7o
 #[tauri::command]
-async fn download(url: &str, dir: &str, proxy: &str, app: tauri::AppHandle) -> Result<(), String> {
+async fn download(
+    url: &str,
+    dir: &str,
+    proxy: &str,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, DownloadState>,
+) -> Result<(), String> {
+    {
+        let child = state
+            .child
+            .lock()
+            .map_err(|_| "下载状态锁定失败".to_string())?;
+        if child.is_some() {
+            return Err("已有下载任务正在运行".to_string());
+        }
+    }
+
     // 获取系统下载目录
     let default_download_dir = get_download_dir()?;
     // 如果用户指定了目录，则使用用户选择的目录；否则使用默认下载目录
@@ -59,6 +85,15 @@ async fn download(url: &str, dir: &str, proxy: &str, app: tauri::AppHandle) -> R
         .spawn()
         .map_err(|err| format!("无法启动 yt-dlp：{}", err))?;
 
+    state.cancelled.store(false, Ordering::SeqCst);
+    {
+        let mut child = state
+            .child
+            .lock()
+            .map_err(|_| "下载状态锁定失败".to_string())?;
+        *child = Some(_child);
+    }
+
     let mut last_error = String::new();
     let mut exit_code = None;
 
@@ -92,9 +127,26 @@ async fn download(url: &str, dir: &str, proxy: &str, app: tauri::AppHandle) -> R
             }
             CommandEvent::Terminated(payload) => {
                 exit_code = payload.code;
+                let mut child = state
+                    .child
+                    .lock()
+                    .map_err(|_| "下载状态锁定失败".to_string())?;
+                *child = None;
             }
             _ => {}
         }
+    }
+
+    {
+        let mut child = state
+            .child
+            .lock()
+            .map_err(|_| "下载状态锁定失败".to_string())?;
+        *child = None;
+    }
+
+    if state.cancelled.swap(false, Ordering::SeqCst) {
+        return Err("下载已取消".to_string());
     }
 
     if exit_code != Some(0) {
@@ -113,13 +165,35 @@ async fn download(url: &str, dir: &str, proxy: &str, app: tauri::AppHandle) -> R
     Ok(())
 }
 
+#[tauri::command]
+fn cancel_download(state: tauri::State<'_, DownloadState>) -> Result<(), String> {
+    state.cancelled.store(true, Ordering::SeqCst);
+
+    let child = {
+        let mut child = state
+            .child
+            .lock()
+            .map_err(|_| "下载状态锁定失败".to_string())?;
+        child.take()
+    };
+
+    match child {
+        Some(child) => child.kill().map_err(|err| format!("取消下载失败：{}", err)),
+        None => {
+            state.cancelled.store(false, Ordering::SeqCst);
+            Err("当前没有正在下载的任务".to_string())
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(DownloadState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![download])
+        .invoke_handler(tauri::generate_handler![download, cancel_download])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

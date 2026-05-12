@@ -21,7 +21,8 @@ const error = ref("");
 const dir = ref("");
 const proxy = ref("");
 const isDownloading = ref(false);
-const downloadStatus = ref("idle"); // idle, downloading, completed, failed
+const isCancelling = ref(false);
+const downloadStatus = ref("idle"); // idle, downloading, completed, failed, cancelled
 const fileName = ref("");
 const downloadSpeed = ref("");
 
@@ -33,6 +34,11 @@ const URL_PATTERN = /^https?:\/\/.+/;
 
 // 表单引用
 const formRef = ref(null);
+
+function getErrorMessage(err) {
+  if (typeof err === "string") return err;
+  return err?.message || String(err);
+}
 
 // URL 验证规则
 const urlRules = {
@@ -107,10 +113,29 @@ async function download() {
     }
   } catch (err) {
     console.error("Failed to run yt-dlp:", err);
-    error.value = "下载失败：" + err.message;
-    downloadStatus.value = "failed";
+    const message = getErrorMessage(err);
+    if (message === "下载已取消") {
+      error.value = "";
+      downloadStatus.value = "cancelled";
+    } else {
+      error.value = "下载失败：" + message;
+      downloadStatus.value = "failed";
+    }
   } finally {
     isDownloading.value = false;
+    isCancelling.value = false;
+  }
+}
+
+async function cancelDownload() {
+  if (!isDownloading.value || isCancelling.value) return;
+
+  isCancelling.value = true;
+  try {
+    await invoke("cancel_download");
+  } catch (err) {
+    error.value = getErrorMessage(err);
+    isCancelling.value = false;
   }
 }
 
@@ -225,6 +250,14 @@ onUnmounted(() => {
         <el-icon><CircleClose /></el-icon>
         下载失败
       </el-tag>
+      <el-tag
+        v-else-if="downloadStatus === 'cancelled'"
+        type="warning"
+        effect="plain"
+      >
+        <el-icon><CircleClose /></el-icon>
+        已取消
+      </el-tag>
     </div>
 
     <el-form id="downloadForm" @submit.prevent="download">
@@ -247,15 +280,27 @@ onUnmounted(() => {
         placement="top"
         :disabled="url.trim()"
       >
-        <el-button
-          type="primary"
-          size="large"
-          :loading="isDownloading"
-          :disabled="isDownloading || !url.trim()"
-          @click="download()"
-        >
-          {{ isDownloading ? "下载中..." : "开始下载" }}
-        </el-button>
+        <div class="download-actions">
+          <el-button
+            type="primary"
+            size="large"
+            :loading="isDownloading"
+            :disabled="isDownloading || !url.trim()"
+            @click="download()"
+          >
+            {{ isDownloading ? "下载中..." : "开始下载" }}
+          </el-button>
+          <el-button
+            v-if="isDownloading"
+            type="danger"
+            size="large"
+            plain
+            :loading="isCancelling"
+            @click="cancelDownload()"
+          >
+            取消
+          </el-button>
+        </div>
       </el-tooltip>
     </el-form>
     <el-progress
@@ -294,8 +339,11 @@ onUnmounted(() => {
             v-model="dir"
             placeholder="未选择目录(默认：系统Downloads目录)"
             readonly
+            :disabled="isDownloading"
           />
-          <el-button type="info" @click="chooseDir()">选择目录</el-button>
+          <el-button type="info" :disabled="isDownloading" @click="chooseDir()"
+            >选择目录</el-button
+          >
         </div>
       </div>
       <div class="confItem">
@@ -305,6 +353,7 @@ onUnmounted(() => {
             id="proxy-input"
             v-model="proxy"
             placeholder="可选：http://127.0.0.1:7890"
+            :disabled="isDownloading"
           />
           <el-tooltip
             content="支持 HTTP/SOCKS5 代理，如：http://127.0.0.1:7890"
@@ -394,13 +443,25 @@ h1 {
 
 #downloadForm {
   display: grid;
-  grid-template-columns: 1fr 12em;
+  grid-template-columns: 1fr auto;
   grid-gap: 1em;
 }
 
 #downloadForm > * {
   height: 3.6em;
   font-size: 1em;
+}
+
+.download-actions {
+  display: flex;
+  gap: 0.75em;
+  height: 100%;
+}
+
+.download-actions .el-button {
+  height: 100%;
+  min-width: 7.5em;
+  margin-left: 0;
 }
 
 .error-message {
