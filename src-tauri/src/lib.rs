@@ -1,7 +1,5 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use directories::UserDirs;
-use std::env;
-use std::str;
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
@@ -14,8 +12,11 @@ fn get_download_dir() -> Result<String, String> {
     let download_dir = user_dirs
         .download_dir()
         .ok_or("无法获取下载目录".to_string())?;
-    // 将下载目录的路径转换为字符串并返回，如果转换失败则解引用并转换为字符串
-    Ok(download_dir.to_str().unwrap().to_string())
+    // 将下载目录的路径转换为字符串并返回
+    Ok(download_dir
+        .to_str()
+        .ok_or("下载目录包含无效字符".to_string())?
+        .to_string())
 }
 
 // 测试
@@ -49,51 +50,65 @@ async fn download(url: &str, dir: &str, proxy: &str, app: tauri::AppHandle) -> R
     let args_string = args.join(" ");
     println!("完整命令：yt-dlp {}", args_string);
     // `sidecar()` 只需要文件名, 不像 JavaScript 中的整个路径
-    let sidecar_command = app.shell().sidecar("my-yt-dlp").unwrap().args(&args);
-    let (mut _rx, mut _child) = sidecar_command.spawn().expect("Failed to spawn sidecar");
+    let sidecar_command = app
+        .shell()
+        .sidecar("my-yt-dlp")
+        .map_err(|err| format!("无法加载 yt-dlp sidecar：{}", err))?
+        .args(&args);
+    let (mut rx, _child) = sidecar_command
+        .spawn()
+        .map_err(|err| format!("无法启动 yt-dlp：{}", err))?;
 
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = _rx.recv().await {
-            match event {
-                CommandEvent::Stdout(line) => {
-                    // 处理标准输出
-                    // let line_str = match str::from_utf8(&line) {
-                    //     Ok(v) => v,
-                    //     Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-                    // };
-                    // println!("yt-dlp stdout: {}", line_str);
-                    let line_str = String::from_utf8_lossy(&line);
-                    println!("yt-dlp stdout: {}", line_str);
+    let mut last_error = String::new();
+    let mut exit_code = None;
 
-                    // 发送实时输出到前端
-                    app.emit("yt-dlp-progress", line_str).unwrap();
+    while let Some(event) = rx.recv().await {
+        match event {
+            CommandEvent::Stdout(line) => {
+                let line_str = String::from_utf8_lossy(&line).to_string();
+                println!("yt-dlp stdout: {}", line_str);
+
+                if let Err(err) = app.emit("yt-dlp-progress", line_str) {
+                    eprintln!("emit yt-dlp-progress failed: {}", err);
                 }
-                CommandEvent::Stderr(line) => {
-                    // 处理错误输出
-                    // let line_str = match str::from_utf8(&line) {
-                    //     Ok(v) => v,
-                    //     Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-                    // };
-                    // eprintln!("yt-dlp stderr: {}", line_str);
-                    let line_str = String::from_utf8_lossy(&line);
-                    eprintln!("yt-dlp stderr: {}", line_str);
-
-                    // 发送错误信息到前端
-                    app.emit("yt-dlp-error", line_str).unwrap();
-                }
-                CommandEvent::Error(err) => {
-                    // 处理错误
-                    eprintln!("yt-dlp error: {}", err);
-
-                    // 发送错误信息到前端
-                    app.emit("yt-dlp-error", err.to_string()).unwrap();
-                }
-                _ => {}
             }
+            CommandEvent::Stderr(line) => {
+                let line_str = String::from_utf8_lossy(&line).to_string();
+                eprintln!("yt-dlp stderr: {}", line_str);
+                last_error = line_str.clone();
+
+                if let Err(err) = app.emit("yt-dlp-error", line_str) {
+                    eprintln!("emit yt-dlp-error failed: {}", err);
+                }
+            }
+            CommandEvent::Error(err) => {
+                let message = err.to_string();
+                eprintln!("yt-dlp error: {}", message);
+                last_error = message.clone();
+
+                if let Err(err) = app.emit("yt-dlp-error", message) {
+                    eprintln!("emit yt-dlp-error failed: {}", err);
+                }
+            }
+            CommandEvent::Terminated(payload) => {
+                exit_code = payload.code;
+            }
+            _ => {}
         }
-    })
-    .await
-    .expect("Execution failed!");
+    }
+
+    if exit_code != Some(0) {
+        let message = if last_error.trim().is_empty() {
+            match exit_code {
+                Some(code) => format!("yt-dlp 退出异常，退出码：{}", code),
+                None => "yt-dlp 已终止，但未返回退出码".to_string(),
+            }
+        } else {
+            last_error
+        };
+
+        return Err(message);
+    }
 
     Ok(())
 }
