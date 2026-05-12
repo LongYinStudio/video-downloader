@@ -168,14 +168,16 @@ function resetAll() {
         <div class="section-title">下载默认值</div>
         <div class="field">
           <el-text class="label" tag="b">保存目录</el-text>
-          <div class="field-content">
+          <div class="field-content dir-field">
             <el-input
               v-model="defaultDir"
               placeholder="未选择目录(默认：系统Downloads目录)"
               readonly
             />
-            <el-button type="info" @click="chooseDir()">选择目录</el-button>
-            <el-button plain @click="clearDir()">清除</el-button>
+            <div class="field-actions">
+              <el-button type="info" @click="chooseDir()">选择目录</el-button>
+              <el-button plain @click="clearDir()">清除</el-button>
+            </div>
           </div>
         </div>
 
@@ -283,7 +285,7 @@ function resetAll() {
 }
 
 .settings-card {
-  width: 90%;
+  width: min(90%, 780px);
   max-width: 780px;
   margin: 0 auto;
   border-radius: 12px;
@@ -329,6 +331,20 @@ function resetAll() {
   align-items: center;
 }
 
+.dir-field {
+  grid-template-columns: 1fr auto;
+}
+
+.field-actions {
+  display: flex;
+  gap: 0.75em;
+  align-items: center;
+}
+
+.field-actions .el-button {
+  margin-left: 0;
+}
+
 .field-content.single {
   grid-template-columns: 1fr;
 }
@@ -354,18 +370,53 @@ function resetAll() {
 }
 
 @media (max-width: 800px) {
+  .main {
+    align-items: stretch;
+  }
+
   .settings-card {
     width: calc(100% - 1.2em);
   }
 
-  .field-content {
+  .field-content,
+  .dir-field,
+  .field-content.numeric {
+    grid-template-columns: 1fr;
+  }
+
+  .field-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-actions .el-button {
+    width: 100%;
+  }
+
+  .field.inline {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.6em;
+  }
+
+  .number-field {
+    grid-template-columns: 5em minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 460px) {
+  .field-actions,
+  .field.inline {
     grid-template-columns: 1fr;
   }
 
   .field.inline {
-    flex-direction: column;
     align-items: start;
-    gap: 0.6em;
+  }
+
+  .number-field {
+    grid-template-columns: 1fr;
+    gap: 0.35em;
   }
 }
 </style>
