@@ -19,6 +19,7 @@ import {
 import DownloadForm from "./DownloadForm.vue";
 import DownloadOptions from "./DownloadOptions.vue";
 import DownloadProgress from "./DownloadProgress.vue";
+import PreviewPanel from "./PreviewPanel.vue";
 
 const url = ref("");
 const progress = ref("");
@@ -38,9 +39,11 @@ const formatPreset = ref(DEFAULT_DOWNLOAD_OPTIONS.format);
 const filenameTemplate = ref(DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate);
 const retries = ref(DEFAULT_DOWNLOAD_OPTIONS.retries);
 const concurrentFragments = ref(DEFAULT_DOWNLOAD_OPTIONS.concurrentFragments);
+const isPreviewing = ref(false);
 const isDownloading = ref(false);
 const isCancelling = ref(false);
 const downloadStatus = ref("idle"); // idle, downloading, completed, failed, cancelled
+const previewItems = ref([]);
 
 const URL_PATTERN = /^https?:\/\/.+/;
 
@@ -93,6 +96,15 @@ function getDownloadError(message) {
     };
   }
   if (
+    normalized.includes("requested format is not available") ||
+    normalized.includes("format is not available")
+  ) {
+    return {
+      message: "当前下载格式在该视频上不可用",
+      tips: ["切换为最佳画质", "尝试降低分辨率限制", "如果只需音频，可改为仅音频 MP3"],
+    };
+  }
+  if (
     normalized.includes("unsupported url") ||
     normalized.includes("not a valid url") ||
     normalized.includes("no video formats found")
@@ -109,9 +121,9 @@ function getDownloadError(message) {
   };
 }
 
-function setDownloadError(rawMessage) {
+function setActionError(rawMessage, prefix = "下载失败") {
   const formatted = getDownloadError(rawMessage);
-  error.value = `下载失败：${formatted.message}`;
+  error.value = `${prefix}：${formatted.message}`;
   errorTips.value = formatted.tips;
 }
 
@@ -127,6 +139,10 @@ function resetDownloadDetails() {
   currentFile.value = "";
   downloadSpeed.value = "";
   eta.value = "";
+}
+
+function clearPreview() {
+  previewItems.value = [];
 }
 
 function parseProgressOutput(output) {
@@ -183,6 +199,44 @@ async function chooseCookiesFile() {
 
 function clearCookiesFile() {
   cookiesPath.value = "";
+}
+
+async function previewInfo() {
+  const urls = getUrls();
+  if (!urls.length) {
+    error.value = "请输入视频链接";
+    return;
+  }
+
+  const invalidUrl = urls.find((item) => !URL_PATTERN.test(item));
+  if (invalidUrl) {
+    error.value = `请输入有效的 URL：${invalidUrl}`;
+    return;
+  }
+
+  error.value = "";
+  errorTips.value = [];
+  isPreviewing.value = true;
+
+  try {
+    const items = await invoke("get_video_info", {
+      options: {
+        urls,
+        proxy: proxy.value,
+        cookiesMode: cookiesMode.value,
+        cookiesPath: cookiesPath.value,
+        cookiesBrowser: cookiesBrowser.value,
+        formatPreset: formatPreset.value,
+      },
+    });
+
+    previewItems.value = Array.isArray(items) ? items : [];
+  } catch (err) {
+    clearPreview();
+    setActionError(getErrorMessage(err), "预览失败");
+  } finally {
+    isPreviewing.value = false;
+  }
 }
 
 async function download() {
@@ -252,7 +306,7 @@ async function download() {
       errorTips.value = [];
       downloadStatus.value = "cancelled";
     } else {
-      setDownloadError(message);
+      setActionError(message);
       downloadStatus.value = "failed";
     }
   } finally {
@@ -270,7 +324,7 @@ async function cancelDownload() {
   try {
     await invoke("cancel_download");
   } catch (err) {
-    setDownloadError(getErrorMessage(err));
+    setActionError(getErrorMessage(err));
     isCancelling.value = false;
   }
 }
@@ -342,9 +396,9 @@ onMounted(() => {
   onListenError = listen("yt-dlp-error", (event) => {
     const urlERROR = event.payload.match(/'([^']*)' is not a valid URL\./);
     if (urlERROR) {
-      setDownloadError(urlERROR[0]);
+      setActionError(urlERROR[0]);
     } else {
-      setDownloadError(event.payload);
+      setActionError(event.payload);
     }
   });
 });
@@ -406,6 +460,12 @@ watch(concurrentFragments, (val) => {
   localStorage.setItem(STORAGE_KEYS.concurrentFragments, String(val));
 });
 
+watch([url, proxy, cookiesMode, cookiesPath, cookiesBrowser, formatPreset], () => {
+  if (!isPreviewing.value) {
+    clearPreview();
+  }
+});
+
 onUnmounted(() => {
   if (onListenProgress) onListenProgress.then((onListen) => onListen());
   if (onListenError) onListenError.then((onListen) => onListen());
@@ -438,10 +498,16 @@ onUnmounted(() => {
       />
       <DownloadForm
         v-model:url="url"
+        :is-previewing="isPreviewing"
         :is-downloading="isDownloading"
         :is-cancelling="isCancelling"
+        @preview="previewInfo"
         @download="download"
         @cancel="cancelDownload"
+      />
+      <PreviewPanel
+        :is-previewing="isPreviewing"
+        :preview-items="previewItems"
       />
       <el-divider />
       <DownloadOptions

@@ -26,6 +26,41 @@ struct DownloadOptions {
     concurrent_fragments: i32,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PreviewOptions {
+    urls: Vec<String>,
+    proxy: String,
+    cookies_mode: String,
+    cookies_path: String,
+    cookies_browser: String,
+    format_preset: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreviewEntry {
+    title: String,
+    uploader: String,
+    duration: String,
+    url: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreviewItem {
+    url: String,
+    title: String,
+    uploader: String,
+    duration: String,
+    thumbnail: String,
+    extractor: String,
+    webpage_url: String,
+    is_playlist: bool,
+    entry_count: usize,
+    entries: Vec<PreviewEntry>,
+}
+
 #[derive(Default)]
 struct DownloadState {
     child: Mutex<Option<CommandChild>>,
@@ -103,6 +138,270 @@ fn validate_browser(browser: &str) -> Result<&str, String> {
     }
 }
 
+fn apply_network_args(
+    args: &mut Vec<String>,
+    proxy: &str,
+    cookies_mode: &str,
+    cookies_path: &str,
+    cookies_browser: &str,
+) -> Result<(), String> {
+    if !proxy.is_empty() {
+        args.push("--proxy".to_string());
+        args.push(proxy.to_string());
+    }
+
+    match cookies_mode {
+        "" | "none" => {}
+        "file" => {
+            if cookies_path.is_empty() {
+                return Err("请选择 Cookies 文件".to_string());
+            }
+            if !Path::new(cookies_path).is_file() {
+                return Err("Cookies 文件不存在或不可读".to_string());
+            }
+            args.push("--cookies".to_string());
+            args.push(cookies_path.to_string());
+        }
+        "browser" => {
+            let browser = validate_browser(cookies_browser)?;
+            args.push("--cookies-from-browser".to_string());
+            args.push(browser.to_string());
+        }
+        _ => return Err("不支持的 Cookies 来源".to_string()),
+    }
+
+    Ok(())
+}
+
+fn get_preview_format_args(format_preset: &str) -> Result<Vec<String>, String> {
+    let args = match format_preset {
+        "" | "best" => Vec::new(),
+        "1080p" => vec![
+            "-f".to_string(),
+            "bv*[height<=1080]+ba/b[height<=1080]/best[height<=1080]".to_string(),
+        ],
+        "720p" => vec![
+            "-f".to_string(),
+            "bv*[height<=720]+ba/b[height<=720]/best[height<=720]".to_string(),
+        ],
+        "480p" => vec![
+            "-f".to_string(),
+            "bv*[height<=480]+ba/b[height<=480]/best[height<=480]".to_string(),
+        ],
+        "audio" => vec!["-f".to_string(), "bestaudio/best".to_string()],
+        _ => return Err("不支持的下载格式".to_string()),
+    };
+
+    Ok(args)
+}
+
+fn build_preview_args(options: &PreviewOptions, url: &str) -> Result<Vec<String>, String> {
+    let mut args = get_preview_format_args(&options.format_preset)?;
+    args.push("--dump-single-json".to_string());
+    args.push("--skip-download".to_string());
+    args.push("--no-warnings".to_string());
+    args.push("--playlist-end".to_string());
+    args.push("5".to_string());
+    apply_network_args(
+        &mut args,
+        &options.proxy,
+        &options.cookies_mode,
+        &options.cookies_path,
+        &options.cookies_browser,
+    )?;
+    args.push(url.to_string());
+
+    Ok(args)
+}
+
+fn first_non_empty(values: Vec<String>) -> String {
+    values
+        .into_iter()
+        .find(|value| !value.trim().is_empty())
+        .unwrap_or_default()
+}
+
+fn read_string_field(value: &serde_json::Value, key: &str) -> String {
+    match value.get(key) {
+        Some(serde_json::Value::String(text)) => text.clone(),
+        Some(serde_json::Value::Number(number)) => number.to_string(),
+        _ => String::new(),
+    }
+}
+
+fn normalize_url(value: String) -> String {
+    if value.starts_with("//") {
+        format!("https:{}", value)
+    } else {
+        value
+    }
+}
+
+fn read_thumbnail_field(value: &serde_json::Value) -> String {
+    let direct_thumbnail = read_string_field(value, "thumbnail");
+    if !direct_thumbnail.trim().is_empty() {
+        return normalize_url(direct_thumbnail);
+    }
+
+    value
+        .get("thumbnails")
+        .and_then(|item| item.as_array())
+        .and_then(|items| items.last())
+        .map(|item| normalize_url(read_string_field(item, "url")))
+        .unwrap_or_default()
+}
+
+fn format_duration(seconds: Option<f64>) -> String {
+    let total_seconds = seconds.unwrap_or_default().round() as u64;
+    if total_seconds == 0 {
+        return String::new();
+    }
+
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let seconds = total_seconds % 60;
+
+    if hours > 0 {
+        format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+    } else {
+        format!("{:02}:{:02}", minutes, seconds)
+    }
+}
+
+fn read_duration(value: &serde_json::Value) -> String {
+    first_non_empty(vec![
+        read_string_field(value, "duration_string"),
+        format_duration(value.get("duration").and_then(|item| item.as_f64())),
+    ])
+}
+
+fn build_preview_entries(value: &serde_json::Value) -> Vec<PreviewEntry> {
+    value
+        .get("entries")
+        .and_then(|entries| entries.as_array())
+        .map(|entries| {
+            entries
+                .iter()
+                .take(5)
+                .map(|entry| PreviewEntry {
+                    title: read_string_field(entry, "title"),
+                    uploader: first_non_empty(vec![
+                        read_string_field(entry, "uploader"),
+                        read_string_field(entry, "channel"),
+                    ]),
+                    duration: read_duration(entry),
+                    url: normalize_url(first_non_empty(vec![
+                        read_string_field(entry, "webpage_url"),
+                        read_string_field(entry, "url"),
+                        read_string_field(entry, "original_url"),
+                    ])),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn build_preview_item(source_url: &str, value: &serde_json::Value) -> PreviewItem {
+    let entries = build_preview_entries(value);
+    let first_entry_thumbnail = value
+        .get("entries")
+        .and_then(|entries| entries.as_array())
+        .and_then(|entries| entries.first())
+        .map(read_thumbnail_field)
+        .unwrap_or_default();
+    let is_playlist = value
+        .get("_type")
+        .and_then(|item| item.as_str())
+        .map(|item| item == "playlist")
+        .unwrap_or(false)
+        || !entries.is_empty();
+    let entry_count = value
+        .get("playlist_count")
+        .and_then(|item| item.as_u64())
+        .map(|count| count as usize)
+        .unwrap_or(entries.len());
+
+    PreviewItem {
+        url: source_url.to_string(),
+        title: first_non_empty(vec![
+            read_string_field(value, "title"),
+            read_string_field(value, "playlist_title"),
+        ]),
+        uploader: first_non_empty(vec![
+            read_string_field(value, "uploader"),
+            read_string_field(value, "channel"),
+            read_string_field(value, "playlist_uploader"),
+        ]),
+        duration: read_duration(value),
+        thumbnail: first_non_empty(vec![read_thumbnail_field(value), first_entry_thumbnail]),
+        extractor: first_non_empty(vec![
+            read_string_field(value, "extractor_key"),
+            read_string_field(value, "extractor"),
+        ]),
+        webpage_url: normalize_url(first_non_empty(vec![
+            read_string_field(value, "webpage_url"),
+            read_string_field(value, "original_url"),
+            source_url.to_string(),
+        ])),
+        is_playlist,
+        entry_count,
+        entries,
+    }
+}
+
+async fn collect_sidecar_output(app: &tauri::AppHandle, args: &[String]) -> Result<String, String> {
+    let sidecar_command = app
+        .shell()
+        .sidecar("my-yt-dlp")
+        .map_err(|err| format!("无法加载 yt-dlp sidecar：{}", err))?
+        .args(args);
+    let (mut rx, _child) = sidecar_command
+        .spawn()
+        .map_err(|err| format!("无法启动 yt-dlp：{}", err))?;
+
+    let mut stdout = String::new();
+    let mut last_error = String::new();
+    let mut exit_code = None;
+
+    while let Some(event) = rx.recv().await {
+        match event {
+            CommandEvent::Stdout(line) => {
+                stdout.push_str(&String::from_utf8_lossy(&line));
+                stdout.push('\n');
+            }
+            CommandEvent::Stderr(line) => {
+                last_error = String::from_utf8_lossy(&line).to_string();
+            }
+            CommandEvent::Error(err) => {
+                last_error = err.to_string();
+            }
+            CommandEvent::Terminated(payload) => {
+                exit_code = payload.code;
+            }
+            _ => {}
+        }
+    }
+
+    if exit_code != Some(0) {
+        let message = if last_error.trim().is_empty() {
+            match exit_code {
+                Some(code) => format!("yt-dlp 退出异常，退出码：{}", code),
+                None => "yt-dlp 已终止，但未返回退出码".to_string(),
+            }
+        } else {
+            last_error
+        };
+
+        return Err(message);
+    }
+
+    if stdout.trim().is_empty() {
+        return Err("yt-dlp 未返回预览信息".to_string());
+    }
+
+    Ok(stdout)
+}
+
 fn build_download_args(options: &DownloadOptions) -> Result<Vec<String>, String> {
     let default_download_dir = get_download_dir()?;
     let download_dir = if !options.dir.is_empty() {
@@ -124,30 +423,13 @@ fn build_download_args(options: &DownloadOptions) -> Result<Vec<String>, String>
     args.push(retries.to_string());
     args.push("-N".to_string());
     args.push(concurrent_fragments.to_string());
-
-    if !options.proxy.is_empty() {
-        args.push("--proxy".to_string());
-        args.push(options.proxy.clone());
-    }
-    match options.cookies_mode.as_str() {
-        "" | "none" => {}
-        "file" => {
-            if options.cookies_path.is_empty() {
-                return Err("请选择 Cookies 文件".to_string());
-            }
-            if !Path::new(&options.cookies_path).is_file() {
-                return Err("Cookies 文件不存在或不可读".to_string());
-            }
-            args.push("--cookies".to_string());
-            args.push(options.cookies_path.clone());
-        }
-        "browser" => {
-            let browser = validate_browser(&options.cookies_browser)?;
-            args.push("--cookies-from-browser".to_string());
-            args.push(browser.to_string());
-        }
-        _ => return Err("不支持的 Cookies 来源".to_string()),
-    }
+    apply_network_args(
+        &mut args,
+        &options.proxy,
+        &options.cookies_mode,
+        &options.cookies_path,
+        &options.cookies_browser,
+    )?;
     args.push("-o".to_string());
     args.push(output);
     args.push(options.url.clone());
@@ -268,6 +550,40 @@ async fn download(
 }
 
 #[tauri::command]
+async fn get_video_info(
+    options: PreviewOptions,
+    app: tauri::AppHandle,
+) -> Result<Vec<PreviewItem>, String> {
+    let mut items = Vec::new();
+
+    for url in &options.urls {
+        let trimmed_url = url.trim();
+        if trimmed_url.is_empty() {
+            continue;
+        }
+
+        let args = build_preview_args(&options, trimmed_url)?;
+        let stdout = collect_sidecar_output(&app, &args)
+            .await
+            .map_err(|err| format!("预览失败（{}）：{}", trimmed_url, err))?;
+        let payload = stdout
+            .lines()
+            .rev()
+            .find(|line| !line.trim().is_empty())
+            .ok_or("yt-dlp 未返回预览信息".to_string())?;
+        let preview_value: serde_json::Value =
+            serde_json::from_str(payload).map_err(|err| format!("解析预览信息失败：{}", err))?;
+        items.push(build_preview_item(trimmed_url, &preview_value));
+    }
+
+    if items.is_empty() {
+        return Err("没有可预览的链接".to_string());
+    }
+
+    Ok(items)
+}
+
+#[tauri::command]
 fn cancel_download(state: tauri::State<'_, DownloadState>) -> Result<(), String> {
     state.cancelled.store(true, Ordering::SeqCst);
 
@@ -295,7 +611,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![download, cancel_download])
+        .invoke_handler(tauri::generate_handler![
+            download,
+            get_video_info,
+            cancel_download
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -4,6 +4,10 @@ defineProps({
     type: String,
     required: true,
   },
+  isPreviewing: {
+    type: Boolean,
+    required: true,
+  },
   isDownloading: {
     type: Boolean,
     required: true,
@@ -14,7 +18,7 @@ defineProps({
   },
 });
 
-const emit = defineEmits(["update:url", "download", "cancel"]);
+const emit = defineEmits(["update:url", "preview", "download", "cancel"]);
 </script>
 
 <template>
@@ -39,10 +43,18 @@ const emit = defineEmits(["update:url", "download", "cancel"]);
     >
       <div class="download-actions">
         <el-button
+          size="large"
+          :loading="isPreviewing"
+          :disabled="isDownloading || isPreviewing || !url.trim()"
+          @click="emit('preview')"
+        >
+          {{ isPreviewing ? "解析中..." : "预览信息" }}
+        </el-button>
+        <el-button
           type="primary"
           size="large"
           :loading="isDownloading"
-          :disabled="isDownloading || !url.trim()"
+          :disabled="isDownloading || isPreviewing || !url.trim()"
           @click="emit('download')"
         >
           {{ isDownloading ? "下载中..." : "开始下载" }}
