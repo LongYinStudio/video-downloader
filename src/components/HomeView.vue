@@ -7,6 +7,8 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { downloadDir } from "@tauri-apps/api/path";
 import { version } from "../utils.js";
 import {
+  COOKIES_BROWSER_OPTIONS,
+  COOKIES_MODE_OPTIONS,
   DEFAULT_DOWNLOAD_OPTIONS,
   FILENAME_TEMPLATE_OPTIONS,
   FORMAT_OPTIONS,
@@ -29,6 +31,9 @@ const queueIndex = ref(0);
 const queueTotal = ref(0);
 const dir = ref("");
 const proxy = ref("");
+const cookiesMode = ref(DEFAULT_DOWNLOAD_OPTIONS.cookiesMode);
+const cookiesPath = ref(DEFAULT_DOWNLOAD_OPTIONS.cookiesPath);
+const cookiesBrowser = ref(DEFAULT_DOWNLOAD_OPTIONS.cookiesBrowser);
 const formatPreset = ref(DEFAULT_DOWNLOAD_OPTIONS.format);
 const filenameTemplate = ref(DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate);
 const retries = ref(DEFAULT_DOWNLOAD_OPTIONS.retries);
@@ -70,7 +75,21 @@ function getDownloadError(message) {
   ) {
     return {
       message: "视频需要登录或没有访问权限",
-      tips: ["确认链接可在浏览器中打开", "检查视频是否为私密或会员内容", "后续可通过 Cookies 支持处理登录内容"],
+      tips: [
+        "确认链接可在浏览器中打开",
+        "检查视频是否为私密或会员内容",
+        "在设置或首页参数中配置 Cookies 来源",
+      ],
+    };
+  }
+  if (normalized.includes("cookie")) {
+    return {
+      message: "Cookies 不可用或读取失败",
+      tips: [
+        "确认 cookies.txt 为 Netscape 格式，或改用浏览器读取",
+        "如使用浏览器读取，先关闭对应浏览器再重试",
+        "确认目标浏览器已登录对应站点",
+      ],
     };
   }
   if (
@@ -150,6 +169,22 @@ async function chooseDir() {
     dir.value = selected;
   }
 }
+
+async function chooseCookiesFile() {
+  const selected = await open({
+    multiple: false,
+    title: "选择 Cookies 文件",
+  });
+
+  if (typeof selected === "string") {
+    cookiesPath.value = selected;
+  }
+}
+
+function clearCookiesFile() {
+  cookiesPath.value = "";
+}
+
 async function download() {
   const urls = getUrls();
   if (!urls.length) {
@@ -182,6 +217,9 @@ async function download() {
           url: item,
           dir: dir.value,
           proxy: proxy.value,
+          cookiesMode: cookiesMode.value,
+          cookiesPath: cookiesPath.value,
+          cookiesBrowser: cookiesBrowser.value,
           formatPreset: formatPreset.value,
           filenameTemplate: filenameTemplate.value,
           retries: retries.value,
@@ -246,6 +284,20 @@ onMounted(() => {
   if (savedDir) dir.value = savedDir;
   const savedProxy = localStorage.getItem(STORAGE_KEYS.proxy);
   if (savedProxy) proxy.value = savedProxy;
+  cookiesMode.value = readOptionSetting(
+    STORAGE_KEYS.cookiesMode,
+    COOKIES_MODE_OPTIONS,
+    localStorage.getItem(STORAGE_KEYS.cookiesPath)
+      ? "file"
+      : DEFAULT_DOWNLOAD_OPTIONS.cookiesMode,
+  );
+  const savedCookiesPath = localStorage.getItem(STORAGE_KEYS.cookiesPath);
+  if (savedCookiesPath) cookiesPath.value = savedCookiesPath;
+  cookiesBrowser.value = readOptionSetting(
+    STORAGE_KEYS.cookiesBrowser,
+    COOKIES_BROWSER_OPTIONS,
+    DEFAULT_DOWNLOAD_OPTIONS.cookiesBrowser,
+  );
   formatPreset.value = readOptionSetting(
     STORAGE_KEYS.format,
     FORMAT_OPTIONS,
@@ -313,6 +365,28 @@ watch(proxy, (val) => {
   localStorage.setItem(STORAGE_KEYS.proxy, val);
 });
 
+watch(cookiesMode, (val) => {
+  localStorage.setItem(
+    STORAGE_KEYS.cookiesMode,
+    val || DEFAULT_DOWNLOAD_OPTIONS.cookiesMode,
+  );
+});
+
+watch(cookiesPath, (val) => {
+  if (!val) {
+    localStorage.removeItem(STORAGE_KEYS.cookiesPath);
+    return;
+  }
+  localStorage.setItem(STORAGE_KEYS.cookiesPath, val);
+});
+
+watch(cookiesBrowser, (val) => {
+  localStorage.setItem(
+    STORAGE_KEYS.cookiesBrowser,
+    val || DEFAULT_DOWNLOAD_OPTIONS.cookiesBrowser,
+  );
+});
+
 watch(formatPreset, (val) => {
   localStorage.setItem(STORAGE_KEYS.format, val || DEFAULT_DOWNLOAD_OPTIONS.format);
 });
@@ -372,6 +446,9 @@ onUnmounted(() => {
       <el-divider />
       <DownloadOptions
         v-model:dir="dir"
+        v-model:cookies-mode="cookiesMode"
+        v-model:cookies-path="cookiesPath"
+        v-model:cookies-browser="cookiesBrowser"
         v-model:format-preset="formatPreset"
         v-model:filename-template="filenameTemplate"
         v-model:retries="retries"
@@ -379,6 +456,8 @@ onUnmounted(() => {
         v-model:proxy="proxy"
         :is-downloading="isDownloading"
         @choose-dir="chooseDir"
+        @choose-cookies="chooseCookiesFile"
+        @clear-cookies="clearCookiesFile"
       />
     </el-card>
 

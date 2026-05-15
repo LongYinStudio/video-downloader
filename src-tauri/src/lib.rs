@@ -1,8 +1,11 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use directories::UserDirs;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Mutex,
+use std::{
+    path::Path,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
 };
 use tauri::Emitter;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -14,6 +17,9 @@ struct DownloadOptions {
     url: String,
     dir: String,
     proxy: String,
+    cookies_mode: String,
+    cookies_path: String,
+    cookies_browser: String,
     format_preset: String,
     filename_template: String,
     retries: i32,
@@ -89,6 +95,14 @@ fn validate_number(value: i32, min: i32, max: i32, field: &str) -> Result<i32, S
     }
 }
 
+fn validate_browser(browser: &str) -> Result<&str, String> {
+    match browser {
+        "brave" | "chrome" | "chromium" | "edge" | "firefox" | "opera" | "safari" | "vivaldi"
+        | "whale" => Ok(browser),
+        _ => Err("不支持的浏览器类型".to_string()),
+    }
+}
+
 fn build_download_args(options: &DownloadOptions) -> Result<Vec<String>, String> {
     let default_download_dir = get_download_dir()?;
     let download_dir = if !options.dir.is_empty() {
@@ -114,6 +128,25 @@ fn build_download_args(options: &DownloadOptions) -> Result<Vec<String>, String>
     if !options.proxy.is_empty() {
         args.push("--proxy".to_string());
         args.push(options.proxy.clone());
+    }
+    match options.cookies_mode.as_str() {
+        "" | "none" => {}
+        "file" => {
+            if options.cookies_path.is_empty() {
+                return Err("请选择 Cookies 文件".to_string());
+            }
+            if !Path::new(&options.cookies_path).is_file() {
+                return Err("Cookies 文件不存在或不可读".to_string());
+            }
+            args.push("--cookies".to_string());
+            args.push(options.cookies_path.clone());
+        }
+        "browser" => {
+            let browser = validate_browser(&options.cookies_browser)?;
+            args.push("--cookies-from-browser".to_string());
+            args.push(browser.to_string());
+        }
+        _ => return Err("不支持的 Cookies 来源".to_string()),
     }
     args.push("-o".to_string());
     args.push(output);

@@ -1,9 +1,26 @@
 <script setup>
 import { QuestionFilled } from "@element-plus/icons-vue";
-import { FILENAME_TEMPLATE_OPTIONS, FORMAT_OPTIONS } from "../settings.js";
+import {
+  COOKIES_BROWSER_OPTIONS,
+  COOKIES_MODE_OPTIONS,
+  FILENAME_TEMPLATE_OPTIONS,
+  FORMAT_OPTIONS,
+} from "../settings.js";
 
 defineProps({
   dir: {
+    type: String,
+    required: true,
+  },
+  cookiesPath: {
+    type: String,
+    required: true,
+  },
+  cookiesMode: {
+    type: String,
+    required: true,
+  },
+  cookiesBrowser: {
     type: String,
     required: true,
   },
@@ -35,12 +52,17 @@ defineProps({
 
 const emit = defineEmits([
   "update:dir",
+  "update:cookiesPath",
+  "update:cookiesMode",
+  "update:cookiesBrowser",
   "update:formatPreset",
   "update:filenameTemplate",
   "update:retries",
   "update:concurrentFragments",
   "update:proxy",
   "choose-dir",
+  "choose-cookies",
+  "clear-cookies",
 ]);
 </script>
 
@@ -85,6 +107,80 @@ const emit = defineEmits([
           <el-icon class="help-icon"><QuestionFilled /></el-icon>
         </el-tooltip>
       </div>
+    </div>
+    <div class="confItem">
+      <el-text class="label" tag="b">Cookies 来源</el-text>
+      <div class="confContent">
+        <el-select
+          :model-value="cookiesMode"
+          :disabled="isDownloading"
+          placeholder="选择 Cookies 来源"
+          @update:model-value="emit('update:cookiesMode', $event)"
+        >
+          <el-option
+            v-for="item in COOKIES_MODE_OPTIONS"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
+        <el-tooltip content="需要登录、会员或私密权限内容时使用" placement="top">
+          <el-icon class="help-icon"><QuestionFilled /></el-icon>
+        </el-tooltip>
+      </div>
+      <div v-if="cookiesMode === 'file'" class="confContent triple with-top-gap">
+        <el-input
+          :model-value="cookiesPath"
+          placeholder="未选择 cookies.txt（Netscape 格式）"
+          readonly
+          :disabled="isDownloading"
+          @update:model-value="emit('update:cookiesPath', $event)"
+        />
+        <el-button
+          type="info"
+          :disabled="isDownloading"
+          @click="emit('choose-cookies')"
+        >
+          选择文件
+        </el-button>
+        <el-button
+          plain
+          :disabled="isDownloading || !cookiesPath"
+          @click="emit('clear-cookies')"
+        >
+          清除
+        </el-button>
+      </div>
+      <div v-else-if="cookiesMode === 'browser'" class="confContent with-top-gap">
+        <el-select
+          :model-value="cookiesBrowser"
+          :disabled="isDownloading"
+          placeholder="选择浏览器"
+          @update:model-value="emit('update:cookiesBrowser', $event)"
+        >
+          <el-option
+            v-for="item in COOKIES_BROWSER_OPTIONS"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
+        <el-tooltip
+          content="如读取失败，先关闭对应浏览器再重试"
+          placement="top"
+        >
+          <el-icon class="help-icon"><QuestionFilled /></el-icon>
+        </el-tooltip>
+      </div>
+      <el-text size="small" class="inline-hint">
+        <template v-if="cookiesMode === 'file'">
+          适用于已导出的 cookies.txt，建议使用 Netscape 格式。
+        </template>
+        <template v-else-if="cookiesMode === 'browser'">
+          直接从已登录浏览器读取 Cookies；支持 Chrome、Edge、Firefox 等。
+        </template>
+        <template v-else>未启用登录态 Cookies。</template>
+      </el-text>
     </div>
     <div class="confItem">
       <el-text class="label" tag="b">文件名模板</el-text>
@@ -184,6 +280,14 @@ const emit = defineEmits([
   grid-template-columns: repeat(2, minmax(8em, 1fr));
 }
 
+.confContent.triple {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.with-top-gap {
+  margin-top: 0.5em;
+}
+
 .number-field {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -206,9 +310,16 @@ const emit = defineEmits([
   color: var(--primary-color);
 }
 
+.inline-hint {
+  display: block;
+  margin-top: 0.5em;
+  color: var(--text-tertiary);
+}
+
 @media (max-width: 720px) {
   .confContent,
-  .confContent.compact {
+  .confContent.compact,
+  .confContent.triple {
     grid-template-columns: 1fr;
   }
 

@@ -2,6 +2,8 @@
 import { onMounted, ref, watch } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
+  COOKIES_BROWSER_OPTIONS,
+  COOKIES_MODE_OPTIONS,
   DEFAULT_DOWNLOAD_OPTIONS,
   FILENAME_TEMPLATE_OPTIONS,
   FORMAT_OPTIONS,
@@ -13,6 +15,9 @@ import {
 const themeMode = ref("system");
 const defaultDir = ref("");
 const defaultProxy = ref("");
+const defaultCookiesMode = ref(DEFAULT_DOWNLOAD_OPTIONS.cookiesMode);
+const defaultCookiesPath = ref(DEFAULT_DOWNLOAD_OPTIONS.cookiesPath);
+const defaultCookiesBrowser = ref(DEFAULT_DOWNLOAD_OPTIONS.cookiesBrowser);
 const defaultFormat = ref(DEFAULT_DOWNLOAD_OPTIONS.format);
 const defaultFilenameTemplate = ref(DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate);
 const defaultRetries = ref(DEFAULT_DOWNLOAD_OPTIONS.retries);
@@ -33,6 +38,21 @@ onMounted(() => {
   themeMode.value = localStorage.getItem(STORAGE_KEYS.theme) || "system";
   defaultDir.value = localStorage.getItem(STORAGE_KEYS.dir) || "";
   defaultProxy.value = localStorage.getItem(STORAGE_KEYS.proxy) || "";
+  defaultCookiesMode.value = readOptionSetting(
+    STORAGE_KEYS.cookiesMode,
+    COOKIES_MODE_OPTIONS,
+    localStorage.getItem(STORAGE_KEYS.cookiesPath)
+      ? "file"
+      : DEFAULT_DOWNLOAD_OPTIONS.cookiesMode,
+  );
+  defaultCookiesPath.value =
+    localStorage.getItem(STORAGE_KEYS.cookiesPath) ||
+    DEFAULT_DOWNLOAD_OPTIONS.cookiesPath;
+  defaultCookiesBrowser.value = readOptionSetting(
+    STORAGE_KEYS.cookiesBrowser,
+    COOKIES_BROWSER_OPTIONS,
+    DEFAULT_DOWNLOAD_OPTIONS.cookiesBrowser,
+  );
   defaultFormat.value = readOptionSetting(
     STORAGE_KEYS.format,
     FORMAT_OPTIONS,
@@ -82,6 +102,28 @@ watch(defaultProxy, (val) => {
   localStorage.setItem(STORAGE_KEYS.proxy, val);
 });
 
+watch(defaultCookiesMode, (val) => {
+  localStorage.setItem(
+    STORAGE_KEYS.cookiesMode,
+    val || DEFAULT_DOWNLOAD_OPTIONS.cookiesMode,
+  );
+});
+
+watch(defaultCookiesPath, (val) => {
+  if (!val) {
+    localStorage.removeItem(STORAGE_KEYS.cookiesPath);
+    return;
+  }
+  localStorage.setItem(STORAGE_KEYS.cookiesPath, val);
+});
+
+watch(defaultCookiesBrowser, (val) => {
+  localStorage.setItem(
+    STORAGE_KEYS.cookiesBrowser,
+    val || DEFAULT_DOWNLOAD_OPTIONS.cookiesBrowser,
+  );
+});
+
 watch(defaultFormat, (val) => {
   localStorage.setItem(STORAGE_KEYS.format, val || DEFAULT_DOWNLOAD_OPTIONS.format);
 });
@@ -121,14 +163,32 @@ async function chooseDir() {
   }
 }
 
+async function chooseCookiesFile() {
+  const selected = await open({
+    multiple: false,
+    title: "选择 Cookies 文件",
+  });
+
+  if (typeof selected === "string") {
+    defaultCookiesPath.value = selected;
+  }
+}
+
 function clearDir() {
   defaultDir.value = "";
+}
+
+function clearCookiesFile() {
+  defaultCookiesPath.value = "";
 }
 
 function resetAll() {
   themeMode.value = "system";
   defaultDir.value = "";
   defaultProxy.value = "";
+  defaultCookiesMode.value = DEFAULT_DOWNLOAD_OPTIONS.cookiesMode;
+  defaultCookiesPath.value = DEFAULT_DOWNLOAD_OPTIONS.cookiesPath;
+  defaultCookiesBrowser.value = DEFAULT_DOWNLOAD_OPTIONS.cookiesBrowser;
   defaultFormat.value = DEFAULT_DOWNLOAD_OPTIONS.format;
   defaultFilenameTemplate.value = DEFAULT_DOWNLOAD_OPTIONS.filenameTemplate;
   defaultRetries.value = DEFAULT_DOWNLOAD_OPTIONS.retries;
@@ -138,6 +198,9 @@ function resetAll() {
   localStorage.removeItem(STORAGE_KEYS.theme);
   localStorage.removeItem(STORAGE_KEYS.dir);
   localStorage.removeItem(STORAGE_KEYS.proxy);
+  localStorage.removeItem(STORAGE_KEYS.cookiesMode);
+  localStorage.removeItem(STORAGE_KEYS.cookiesPath);
+  localStorage.removeItem(STORAGE_KEYS.cookiesBrowser);
   localStorage.removeItem(STORAGE_KEYS.format);
   localStorage.removeItem(STORAGE_KEYS.filenameTemplate);
   localStorage.removeItem(STORAGE_KEYS.retries);
@@ -194,6 +257,61 @@ function resetAll() {
             </el-select>
           </div>
           <p class="hint">指定最高分辨率或仅下载音频；MP3 需要 FFmpeg 支持。</p>
+        </div>
+
+        <div class="field">
+          <el-text class="label" tag="b">Cookies 来源</el-text>
+          <div class="field-content single">
+            <el-select
+              v-model="defaultCookiesMode"
+              placeholder="选择 Cookies 来源"
+            >
+              <el-option
+                v-for="item in COOKIES_MODE_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </div>
+          <div
+            v-if="defaultCookiesMode === 'file'"
+            class="field-content cookies-field with-top-gap"
+          >
+            <el-input
+              v-model="defaultCookiesPath"
+              placeholder="未选择 cookies.txt（Netscape 格式）"
+              readonly
+            />
+            <div class="field-actions">
+              <el-button type="info" @click="chooseCookiesFile()">选择文件</el-button>
+              <el-button plain @click="clearCookiesFile()">清除</el-button>
+            </div>
+          </div>
+          <div
+            v-else-if="defaultCookiesMode === 'browser'"
+            class="field-content single with-top-gap"
+          >
+            <el-select
+              v-model="defaultCookiesBrowser"
+              placeholder="选择浏览器"
+            >
+              <el-option
+                v-for="item in COOKIES_BROWSER_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </div>
+          <p class="hint" v-if="defaultCookiesMode === 'file'">
+            用于下载需要登录、会员或私密权限的视频，建议导出 Netscape 格式的
+            cookies.txt。
+          </p>
+          <p class="hint" v-else-if="defaultCookiesMode === 'browser'">
+            直接从已登录浏览器读取 Cookies；如读取失败，先关闭浏览器再重试。
+          </p>
+          <p class="hint" v-else>不使用 Cookies，适合公开可访问内容。</p>
         </div>
 
         <div class="field">
@@ -351,6 +469,10 @@ function resetAll() {
 
 .field-content.numeric {
   grid-template-columns: repeat(2, minmax(10em, 1fr));
+}
+
+.with-top-gap {
+  margin-top: 0.5em;
 }
 
 .number-field {

@@ -2,6 +2,9 @@ export const STORAGE_KEYS = {
   theme: "vd.theme",
   dir: "vd.dir",
   proxy: "vd.proxy",
+  cookiesMode: "vd.cookies_mode",
+  cookiesPath: "vd.cookies_path",
+  cookiesBrowser: "vd.cookies_browser",
   format: "vd.format",
   filenameTemplate: "vd.filename_template",
   retries: "vd.retries",
@@ -25,7 +28,28 @@ export const FILENAME_TEMPLATE_OPTIONS = [
   { label: "日期 + 标题", value: "date_title" },
 ];
 
+export const COOKIES_MODE_OPTIONS = [
+  { label: "不使用", value: "none" },
+  { label: "cookies.txt 文件", value: "file" },
+  { label: "从浏览器读取", value: "browser" },
+];
+
+export const COOKIES_BROWSER_OPTIONS = [
+  { label: "Chrome", value: "chrome" },
+  { label: "Edge", value: "edge" },
+  { label: "Firefox", value: "firefox" },
+  { label: "Chromium", value: "chromium" },
+  { label: "Brave", value: "brave" },
+  { label: "Opera", value: "opera" },
+  { label: "Vivaldi", value: "vivaldi" },
+  { label: "Safari", value: "safari" },
+  { label: "Whale", value: "whale" },
+];
+
 export const DEFAULT_DOWNLOAD_OPTIONS = {
+  cookiesMode: "none",
+  cookiesPath: "",
+  cookiesBrowser: "chrome",
   format: "best",
   filenameTemplate: "title",
   retries: 10,
