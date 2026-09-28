@@ -1,5 +1,5 @@
 <script setup>
-import { Loading, CircleCheck, CircleClose } from "@element-plus/icons-vue";
+import { Loading, CircleCheck, CircleClose, Warning, Refresh } from "@element-plus/icons-vue";
 
 defineProps({
   downloadStatus: {
@@ -34,6 +34,14 @@ defineProps({
     type: Number,
     required: true,
   },
+  successCount: {
+    type: Number,
+    default: 0,
+  },
+  failedItems: {
+    type: Array,
+    default: () => [],
+  },
   error: {
     type: String,
     required: true,
@@ -44,7 +52,7 @@ defineProps({
   },
 });
 
-const emit = defineEmits(["clear-error"]);
+const emit = defineEmits(["clear-error", "retry-failed"]);
 </script>
 
 <template>
@@ -63,11 +71,19 @@ const emit = defineEmits(["clear-error"]);
       effect="plain"
     >
       <el-icon><CircleCheck /></el-icon>
-      下载完成
+      {{ queueTotal > 1 ? `全部下载完成 (${successCount} 个文件)` : "下载完成" }}
+    </el-tag>
+    <el-tag
+      v-else-if="downloadStatus === 'partial_failed'"
+      type="warning"
+      effect="plain"
+    >
+      <el-icon><Warning /></el-icon>
+      部分下载失败 (成功 {{ successCount }}，失败 {{ failedItems.length }})
     </el-tag>
     <el-tag v-else-if="downloadStatus === 'failed'" type="danger" effect="plain">
       <el-icon><CircleClose /></el-icon>
-      下载失败
+      {{ queueTotal > 1 ? `全部下载失败 (${failedItems.length} 个文件)` : "下载失败" }}
     </el-tag>
     <el-tag
       v-else-if="downloadStatus === 'cancelled'"
@@ -130,9 +146,97 @@ const emit = defineEmits(["clear-error"]);
       </template>
     </el-alert>
   </div>
+  <div v-if="failedItems && failedItems.length > 0" class="failed-summary">
+    <div class="failed-header">
+      <span class="failed-title">
+        <el-icon><Warning /></el-icon>
+        下载失败项 ({{ failedItems.length }})
+      </span>
+      <el-button
+        type="warning"
+        size="small"
+        plain
+        :disabled="isDownloading"
+        @click="emit('retry-failed')"
+      >
+        <el-icon><Refresh /></el-icon>
+        重试失败项
+      </el-button>
+    </div>
+    <ul class="failed-list">
+      <li v-for="(item, idx) in failedItems" :key="idx" class="failed-item">
+        <div class="failed-url" :title="item.url">{{ item.url }}</div>
+        <div class="failed-reason">{{ item.message }}</div>
+      </li>
+    </ul>
+  </div>
 </template>
 
 <style scoped>
+.failed-summary {
+  margin: 1.2em auto 0;
+  width: 90%;
+  padding: 0.85em 1em;
+  background-color: color-mix(in srgb, var(--danger-color) 8%, var(--bg-secondary));
+  border: 1px solid color-mix(in srgb, var(--danger-color) 25%, transparent);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.failed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6em;
+}
+
+.failed-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-weight: 600;
+  color: var(--danger-color);
+  font-size: 0.95em;
+}
+
+.failed-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.failed-item {
+  font-size: 0.88em;
+  padding: 0.4em 0.6em;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  border-left: 3px solid var(--danger-color);
+}
+
+.failed-url {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.failed-reason {
+  margin-top: 0.2em;
+  color: var(--text-tertiary);
+  font-size: 0.82em;
+}
+
+@media (max-width: 720px) {
+  .failed-summary {
+    width: 100%;
+  }
+}
 .status-bar {
   display: flex;
   justify-content: center;

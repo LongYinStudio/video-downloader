@@ -42,8 +42,10 @@ const concurrentFragments = ref(DEFAULT_DOWNLOAD_OPTIONS.concurrentFragments);
 const isPreviewing = ref(false);
 const isDownloading = ref(false);
 const isCancelling = ref(false);
-const downloadStatus = ref("idle"); // idle, downloading, completed, failed, cancelled
+const downloadStatus = ref("idle"); // idle, downloading, completed, partial_failed, failed, cancelled
 const previewItems = ref([]);
+const failedItems = ref([]);
+const successCount = ref(0);
 
 const URL_PATTERN = /^https?:\/\/.+/;
 
@@ -239,8 +241,8 @@ async function previewInfo() {
   }
 }
 
-async function download() {
-  const urls = getUrls();
+async function download(customUrls = null) {
+  const urls = Array.isArray(customUrls) ? customUrls : getUrls();
   if (!urls.length) {
     error.value = "请输入视频链接";
     downloadStatus.value = "failed";
@@ -257,15 +259,21 @@ async function download() {
   resetDownloadDetails();
   error.value = "";
   errorTips.value = [];
+  failedItems.value = [];
+  successCount.value = 0;
   isDownloading.value = true;
   downloadStatus.value = "downloading";
   queueTotal.value = urls.length;
 
-  try {
-    for (const [index, item] of urls.entries()) {
-      queueIndex.value = index + 1;
-      resetDownloadDetails();
+  let wasCancelled = false;
 
+  for (const [index, item] of urls.entries()) {
+    if (wasCancelled || isCancelling.value) break;
+
+    queueIndex.value = index + 1;
+    resetDownloadDetails();
+
+    try {
       await invoke("download", {
         options: {
           url: item,
@@ -280,9 +288,48 @@ async function download() {
           concurrentFragments: concurrentFragments.value,
         },
       });
-    }
+      successCount.value += 1;
+    } catch (err) {
+      const message = getErrorMessage(err);
+      if (message === "下载已取消") {
+        wasCancelled = true;
+        break;
+      }
+      const formatted = getDownloadError(message);
+      failedItems.value.push({
+        url: item,
+        message: formatted.message,
+        rawMessage: message,
+        tips: formatted.tips,
+      });
 
+      if (urls.length === 1) {
+        setActionError(message);
+      }
+    }
+  }
+
+  if (wasCancelled) {
+    error.value = "";
+    errorTips.value = [];
+    downloadStatus.value = "cancelled";
+  } else if (failedItems.value.length === 0) {
+    error.value = "";
+    errorTips.value = [];
     downloadStatus.value = "completed";
+  } else if (successCount.value > 0) {
+    downloadStatus.value = "partial_failed";
+    error.value = `批量任务完成：${successCount.value} 个成功，${failedItems.value.length} 个失败`;
+    errorTips.value = ["可展开下方失败列表查看原因或点击一键重试"];
+  } else {
+    downloadStatus.value = "failed";
+    if (failedItems.value.length > 1) {
+      error.value = `批量下载失败：共 ${failedItems.value.length} 个任务均未下载成功`;
+      errorTips.value = ["请检查网络连接及代理设置", "检查是否需要配置登录态 Cookies", "可点击下方重试失败项"];
+    }
+  }
+
+  if (successCount.value > 0) {
     const autoOpenDir = localStorage.getItem(STORAGE_KEYS.autoOpenDir) !== "false";
     if (autoOpenDir) {
       let targetDir = dir.value;
@@ -299,22 +346,17 @@ async function download() {
         error.value = getErrorMessage(openErr);
       }
     }
-  } catch (err) {
-    const message = getErrorMessage(err);
-    if (message === "下载已取消") {
-      error.value = "";
-      errorTips.value = [];
-      downloadStatus.value = "cancelled";
-    } else {
-      setActionError(message);
-      downloadStatus.value = "failed";
-    }
-  } finally {
-    isDownloading.value = false;
-    isCancelling.value = false;
-    queueIndex.value = 0;
-    queueTotal.value = 0;
   }
+
+  isDownloading.value = false;
+  isCancelling.value = false;
+}
+
+function retryFailed() {
+  if (!failedItems.value.length || isDownloading.value) return;
+  const failedUrls = failedItems.value.map((item) => item.url);
+  url.value = failedUrls.join("\n");
+  download(failedUrls);
 }
 
 async function cancelDownload() {
@@ -492,9 +534,12 @@ onUnmounted(() => {
         :eta="eta"
         :queue-index="queueIndex"
         :queue-total="queueTotal"
+        :success-count="successCount"
+        :failed-items="failedItems"
         :error="error"
         :error-tips="errorTips"
         @clear-error="error = ''"
+        @retry-failed="retryFailed"
       />
       <DownloadForm
         v-model:url="url"
