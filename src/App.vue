@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from "vue";
-import { Menu as IconMenu, Setting, InfoFilled } from "@element-plus/icons-vue";
+import { Menu as IconMenu, Clock, Setting, InfoFilled } from "@element-plus/icons-vue";
 import { STORAGE_KEYS } from "./settings.js";
 
 const isCollapse = ref(true);
@@ -29,6 +29,10 @@ applyTheme(localStorage.getItem(STORAGE_KEYS.theme) || "system");
       <el-menu-item index="/">
         <el-icon class="menu-icon"><icon-menu /></el-icon>
         <template #title>首页</template>
+      </el-menu-item>
+      <el-menu-item index="/history">
+        <el-icon class="menu-icon"><Clock /></el-icon>
+        <template #title>历史</template>
       </el-menu-item>
       <el-menu-item index="/settings">
         <el-icon class="menu-icon"><setting /></el-icon>
