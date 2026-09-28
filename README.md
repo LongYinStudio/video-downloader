@@ -1,7 +1,7 @@
 # 视频下载工具
 
 <div align="center">
-    <img alt="logo" src="./src-tauri/icons/logo.png"/>
+    <img alt="logo" src="./src-tauri/icons/logo.png" style="width: 80px;"/>
 </div>
 
 <div align="center">
@@ -26,9 +26,8 @@
 
 ## 截图
 
-![截图](./public/20260515_154042.png)
-![截图](./public/20260515_154231.png)
-![截图](./public/20260204_102657.png)
+| ![](.github/assets/1.png) | ![](.github/assets/2.png) | ![](.github/assets/3.png) | ![](.github/assets/4.png) |
+| ------------------------- | ------------------------ | ------------------------ | ------------------------ |
 
 ## 依赖
 

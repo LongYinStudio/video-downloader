@@ -1,7 +1,7 @@
 # Videos Downloader
 
 <div align="center">
-    <img alt="logo" src="./src-tauri/icons/logo.png"/>
+    <img alt="logo" src="./src-tauri/icons/logo.png" style="width: 80px;"/>
 </div>
 
 <div align="center">
@@ -26,9 +26,8 @@
 
 ## Screenshots
 
-![Screenshot1](./public/20260515_154042.png)
-![Screenshot2](./public/20260515_154231.png)
-![Screenshot3](./public/20260204_102657.png)
+| ![](.github/assets/1.png) | ![](.github/assets/2.png) | ![](.github/assets/3.png) | ![](.github/assets/4.png) |
+| ------------------------- | ------------------------ | ------------------------ | ------------------------ |
 
 ## depends
 
