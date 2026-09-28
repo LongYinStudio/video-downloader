@@ -604,6 +604,49 @@ fn cancel_download(state: tauri::State<'_, DownloadState>) -> Result<(), String>
     }
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EnvironmentInfo {
+    ffmpeg_available: bool,
+    ffmpeg_version: String,
+    ytdlp_available: bool,
+    ytdlp_version: String,
+}
+
+#[tauri::command]
+async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentInfo, String> {
+    let (ffmpeg_available, ffmpeg_version) =
+        match std::process::Command::new("ffmpeg").arg("-version").output() {
+            Ok(output) if output.status.success() => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let first_line = stdout.lines().next().unwrap_or("").trim();
+                let version = first_line
+                    .strip_prefix("ffmpeg version ")
+                    .and_then(|s| s.split_whitespace().next())
+                    .unwrap_or(first_line)
+                    .to_string();
+                (true, version)
+            }
+            _ => (false, "未检测到 FFmpeg".to_string()),
+        };
+
+    let ytdlp_args = vec!["--version".to_string()];
+    let (ytdlp_available, ytdlp_version) = match collect_sidecar_output(&app, &ytdlp_args).await {
+        Ok(stdout) => {
+            let ver = stdout.lines().next().unwrap_or("").trim().to_string();
+            (true, ver)
+        }
+        Err(err) => (false, format!("不可用: {}", err)),
+    };
+
+    Ok(EnvironmentInfo {
+        ffmpeg_available,
+        ffmpeg_version,
+        ytdlp_available,
+        ytdlp_version,
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -614,7 +657,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             download,
             get_video_info,
-            cancel_download
+            cancel_download,
+            check_environment
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

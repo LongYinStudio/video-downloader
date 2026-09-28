@@ -1,6 +1,9 @@
 <script setup>
 import { onMounted, ref, watch } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { Refresh } from "@element-plus/icons-vue";
 import {
   COOKIES_BROWSER_OPTIONS,
   COOKIES_MODE_OPTIONS,
@@ -24,6 +27,26 @@ const defaultRetries = ref(DEFAULT_DOWNLOAD_OPTIONS.retries);
 const defaultConcurrentFragments = ref(DEFAULT_DOWNLOAD_OPTIONS.concurrentFragments);
 const autoOpenDir = ref(true);
 const autoPasteClipboard = ref(false);
+
+const isCheckingEnv = ref(false);
+const envInfo = ref({
+  ffmpegAvailable: false,
+  ffmpegVersion: "",
+  ytdlpAvailable: false,
+  ytdlpVersion: "",
+});
+
+async function detectEnvironment() {
+  isCheckingEnv.value = true;
+  try {
+    const res = await invoke("check_environment");
+    envInfo.value = res;
+  } catch (err) {
+    console.error("Failed to detect environment:", err);
+  } finally {
+    isCheckingEnv.value = false;
+  }
+}
 
 function applyTheme(mode) {
   const root = document.documentElement;
@@ -79,6 +102,7 @@ onMounted(() => {
   autoPasteClipboard.value =
     localStorage.getItem(STORAGE_KEYS.autoPasteClipboard) === "true";
   applyTheme(themeMode.value);
+  detectEnvironment();
 });
 
 watch(themeMode, (val) => {
@@ -372,6 +396,76 @@ function resetAll() {
       <el-divider />
 
       <section class="section">
+        <div class="section-header-row">
+          <div class="section-title">环境依赖检测</div>
+          <el-button
+            size="small"
+            plain
+            :loading="isCheckingEnv"
+            @click="detectEnvironment"
+          >
+            <el-icon><Refresh /></el-icon>
+            重新检测
+          </el-button>
+        </div>
+        <div class="env-grid">
+          <div class="env-card">
+            <div class="env-top">
+              <span class="env-name">FFmpeg</span>
+              <el-tag
+                :type="envInfo.ffmpegAvailable ? 'success' : 'danger'"
+                size="small"
+                effect="light"
+                round
+              >
+                {{ envInfo.ffmpegAvailable ? "已检测到" : "未检测到" }}
+              </el-tag>
+            </div>
+            <div class="env-body">
+              <div v-if="envInfo.ffmpegAvailable" class="env-text">
+                版本：{{ envInfo.ffmpegVersion }}
+              </div>
+              <div v-else class="env-warn">
+                系统 PATH 未检测到 FFmpeg。高清音视频合并及 MP3 音频转码将不可用。
+              </div>
+            </div>
+            <el-button
+              v-if="!envInfo.ffmpegAvailable"
+              type="primary"
+              link
+              size="small"
+              class="env-link"
+              @click="openUrl('https://ffmpeg.org/download.html')"
+            >
+              前往安装 FFmpeg →
+            </el-button>
+          </div>
+
+          <div class="env-card">
+            <div class="env-top">
+              <span class="env-name">yt-dlp 内核</span>
+              <el-tag
+                :type="envInfo.ytdlpAvailable ? 'success' : 'danger'"
+                size="small"
+                effect="light"
+                round
+              >
+                {{ envInfo.ytdlpAvailable ? "已就绪" : "异常" }}
+              </el-tag>
+            </div>
+            <div class="env-body">
+              <div class="env-text">
+                版本：{{ envInfo.ytdlpVersion || "检测中..." }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="section-desc">FFmpeg 影响合并与音频转换；yt-dlp 为底层视频解析与下载内核。</p>
+      </section>
+
+      <el-divider />
+
+      <section class="section">
         <div class="section-title">其他</div>
         <div class="field inline">
           <el-text class="label" tag="b">下载完成后打开目录</el-text>
@@ -421,6 +515,65 @@ function resetAll() {
   font-size: 1.05em;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.env-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85em;
+}
+
+.env-card {
+  padding: 0.9em 1.1em;
+  border-radius: 8px;
+  background-color: color-mix(in srgb, var(--bg-primary) 70%, var(--bg-secondary));
+  border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  text-align: left;
+}
+
+.env-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.env-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95em;
+}
+
+.env-body {
+  min-height: 2.2em;
+  display: flex;
+  align-items: center;
+}
+
+.env-text {
+  font-size: 0.86em;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.env-warn {
+  font-size: 0.82em;
+  color: var(--danger-color);
+  line-height: 1.4;
+}
+
+.env-link {
+  align-self: flex-start;
+  padding: 0;
+  margin-top: 0.1em;
 }
 
 .section-desc,
@@ -502,7 +655,8 @@ function resetAll() {
 
   .field-content,
   .dir-field,
-  .field-content.numeric {
+  .field-content.numeric,
+  .env-grid {
     grid-template-columns: 1fr;
   }
 
