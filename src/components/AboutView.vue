@@ -1,9 +1,11 @@
 <script setup>
 import { ref } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { version } from "../utils.js";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ChatLineRound, Download, Refresh } from "@element-plus/icons-vue";
+import { STORAGE_KEYS } from "../settings.js";
 
 const isChecking = ref(false);
 const updateDialogVisible = ref(false);
@@ -30,30 +32,18 @@ function compareVersions(v1, v2) {
 async function checkUpdate() {
   isChecking.value = true;
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const savedProxy = localStorage.getItem(STORAGE_KEYS.proxy) || "";
+    const data = await invoke("check_app_update", {
+      proxy: savedProxy || null,
+    });
 
-    const response = await fetch(
-      "https://api.github.com/repos/LongYinStudio/video-downloader/releases/latest",
-      {
-        signal: controller.signal,
-        headers: { Accept: "application/vnd.github.v3+json" },
-      },
-    );
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`HTTP 状态码: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const latestTag = data.tag_name || "";
+    const latestTag = data.tagName || "";
     latestRelease.value = {
       tagName: latestTag,
       name: data.name || latestTag,
       body: data.body || "暂无版本更新说明",
       htmlUrl:
-        data.html_url ||
+        data.htmlUrl ||
         "https://github.com/LongYinStudio/video-downloader/releases/latest",
     };
 
@@ -64,7 +54,7 @@ async function checkUpdate() {
     }
   } catch (err) {
     ElMessageBox.confirm(
-      `检查更新失败（${err?.message || "网络连接异常"}），是否前往 GitHub Releases 页面查看？`,
+      `检查更新未成功（${err?.message || err || "网络连接异常"}），是否前往 GitHub Releases 页面查看？`,
       "提示",
       {
         confirmButtonText: "前往查看",

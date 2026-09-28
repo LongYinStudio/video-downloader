@@ -647,6 +647,93 @@ async fn check_environment(app: tauri::AppHandle) -> Result<EnvironmentInfo, Str
     })
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct ReleaseInfo {
+    tag_name: String,
+    name: String,
+    body: String,
+    html_url: String,
+}
+
+#[tauri::command]
+async fn check_app_update(proxy: Option<String>) -> Result<ReleaseInfo, String> {
+    let mut builder = reqwest::Client::builder()
+        .user_agent("video-downloader-app")
+        .timeout(std::time::Duration::from_secs(8));
+
+    if let Some(ref p) = proxy {
+        let p_trimmed = p.trim();
+        if !p_trimmed.is_empty() {
+            if let Ok(proxy_obj) = reqwest::Proxy::all(p_trimmed) {
+                builder = builder.proxy(proxy_obj);
+            }
+        }
+    }
+
+    let client = builder
+        .build()
+        .map_err(|e| format!("创建网络客户端失败: {}", e))?;
+
+    // 1. 尝试直接请求 GitHub REST API (如果未触发速率限制，可获取完整说明)
+    let api_url = "https://api.github.com/repos/LongYinStudio/video-downloader/releases/latest";
+    if let Ok(res) = client.get(api_url).send().await {
+        if res.status().is_success() {
+            if let Ok(info) = res.json::<ReleaseInfo>().await {
+                return Ok(info);
+            }
+        }
+    }
+
+    // 2. 备用兜底机制：通过 github.com/releases/latest 的 302 重定向 Location 读取版本号，不受 API 403 速率限制
+    let mut web_builder = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(8));
+
+    if let Some(ref p) = proxy {
+        let p_trimmed = p.trim();
+        if !p_trimmed.is_empty() {
+            if let Ok(proxy_obj) = reqwest::Proxy::all(p_trimmed) {
+                web_builder = web_builder.proxy(proxy_obj);
+            }
+        }
+    }
+
+    let web_client = web_builder
+        .build()
+        .map_err(|e| format!("创建网络客户端失败: {}", e))?;
+
+    let web_url = "https://github.com/LongYinStudio/video-downloader/releases/latest";
+    let web_res = web_client
+        .get(web_url)
+        .send()
+        .await
+        .map_err(|e| format!("连接 GitHub 失败: {}", e))?;
+
+    if let Some(location) = web_res.headers().get("location") {
+        let loc_str = location.to_str().unwrap_or("").trim();
+        // loc_str: https://github.com/LongYinStudio/video-downloader/releases/tag/v0.4.0
+        let tag = loc_str
+            .split("/tag/")
+            .nth(1)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+
+        if !tag.is_empty() {
+            return Ok(ReleaseInfo {
+                tag_name: tag.clone(),
+                name: format!("video-downloader {}", tag),
+                body: "已检测到新版本，请前往 GitHub Releases 页面查看完整更新说明与安装包。".to_string(),
+                html_url: loc_str.to_string(),
+            });
+        }
+    }
+
+    Err("无法获取版本信息，请检查网络或代理设置".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -658,7 +745,8 @@ pub fn run() {
             download,
             get_video_info,
             cancel_download,
-            check_environment
+            check_environment,
+            check_app_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
