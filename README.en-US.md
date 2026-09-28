@@ -34,18 +34,33 @@
 - Make sure [ffmpeg](https://ffmpeg.org/download.html) is in your system path.
   > Note: FFmpeg does not affect the download, only affects the final file merge.
 
-## 安装
+## Installation
 
-1. Archlinux
+### Arch Linux
 
-   > video-downloader-longyinstudio(aur)
+Install from the AUR using your preferred AUR helper:
 
 ```bash
 yay -S video-downloader-longyinstudio
-Or
+```
+
+or:
+
+```bash
 paru -S video-downloader-longyinstudio
 ```
 
-2. Others
+### macOS
 
-   > Download the installation package ending in from the Latest [Release](https://github.com/LongYinStudio/video-downloader/releases/latest) page.
+Install via Homebrew:
+
+```bash
+brew tap LongYinStudio/tap
+brew install --cask video-downloader
+```
+
+Alternatively, download the latest macOS `.dmg` package from the [Releases](https://github.com/LongYinStudio/video-downloader/releases/latest) page.
+
+### Other Platforms
+
+Download the appropriate installation package for your platform from the latest [Release](https://github.com/LongYinStudio/video-downloader/releases/latest).

@@ -36,16 +36,32 @@
 
 ## 安装
 
-1. Archlinux
+### Arch Linux
 
-   > video-downloader-longyinstudio(aur)
+通过你喜欢的 AUR Helper 安装：
 
 ```bash
 yay -S video-downloader-longyinstudio
-Or
+```
+
+或者:
+
+```bash
 paru -S video-downloader-longyinstudio
 ```
 
-2. Others
+### macOS
 
-   > 从[Release](https://github.com/LongYinStudio/video-downloader/releases/latest)下载对应的包
+推荐通过 Homebrew 安装:
+
+```bash
+brew tap LongYinStudio/tap
+brew install --cask video-downloader
+```
+
+也可以从最新的 [Releases](https://github.com/LongYinStudio/video-downloader/releases/latest) 页面下载最新的 macOS `.dmg` 安装包。
+
+### 其他平台
+
+请前往最新的 [Release](https://github.com/LongYinStudio/video-downloader/releases/latest) 页面，根据你的操作系统下载对应的安装包。
+
