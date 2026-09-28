@@ -3,7 +3,16 @@ import { onMounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Refresh } from "@element-plus/icons-vue";
+import {
+  Refresh,
+  Folder,
+  Delete,
+  Sunny,
+  Moon,
+  Monitor,
+  Tools,
+  QuestionFilled,
+} from "@element-plus/icons-vue";
 import {
   COOKIES_BROWSER_OPTIONS,
   COOKIES_MODE_OPTIONS,
@@ -236,308 +245,452 @@ function resetAll() {
 </script>
 
 <template>
-  <div class="main">
-    <h3 class="title">设置</h3>
-    <el-card class="settings-card" shadow="hover">
-      <section class="section">
-        <div class="section-title">主题</div>
-        <el-radio-group v-model="themeMode" size="large">
-          <el-radio-button label="system">跟随系统</el-radio-button>
-          <el-radio-button label="light">浅色</el-radio-button>
-          <el-radio-button label="dark">深色</el-radio-button>
-        </el-radio-group>
-        <p class="section-desc">覆盖系统主题，仅影响应用界面。</p>
-      </section>
-
-      <el-divider />
-
-      <section class="section">
-        <div class="section-title">下载默认值</div>
-        <div class="field">
-          <el-text class="label" tag="b">保存目录</el-text>
-          <div class="field-content dir-field">
-            <el-input
-              v-model="defaultDir"
-              placeholder="未选择目录(默认：系统Downloads目录)"
-              readonly
-            />
-            <div class="field-actions">
-              <el-button type="info" @click="chooseDir()">选择目录</el-button>
-              <el-button plain @click="clearDir()">清除</el-button>
-            </div>
-          </div>
+  <div class="settings-page">
+    <div class="page-container">
+      <!-- 页面顶部标题栏 -->
+      <header class="page-topbar">
+        <div class="topbar-title-group">
+          <h2 class="page-title">参数设置</h2>
+          <span class="page-subtitle">定制应用外观、下载规则与内核运行环境</span>
         </div>
+      </header>
 
-        <div class="field">
-          <el-text class="label" tag="b">下载格式</el-text>
-          <div class="field-content single">
-            <el-select v-model="defaultFormat" placeholder="选择下载格式">
-              <el-option
-                v-for="item in FORMAT_OPTIONS"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
+      <div class="settings-stack">
+        <!-- 1. 外观主题卡片 -->
+        <section class="config-card">
+          <div class="card-header">
+            <h3 class="card-title">界面外观</h3>
+            <span class="card-desc">选择符合使用习惯的主题模式</span>
           </div>
-          <p class="hint">指定最高分辨率或仅下载音频；MP3 需要 FFmpeg 支持。</p>
-        </div>
-
-        <div class="field">
-          <el-text class="label" tag="b">Cookies 来源</el-text>
-          <div class="field-content single">
-            <el-select
-              v-model="defaultCookiesMode"
-              placeholder="选择 Cookies 来源"
+          <div class="theme-options">
+            <div
+              class="theme-chip"
+              :class="{ 'is-selected': themeMode === 'system' }"
+              @click="themeMode = 'system'"
             >
-              <el-option
-                v-for="item in COOKIES_MODE_OPTIONS"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </div>
-          <div
-            v-if="defaultCookiesMode === 'file'"
-            class="field-content cookies-field with-top-gap"
-          >
-            <el-input
-              v-model="defaultCookiesPath"
-              placeholder="未选择 cookies.txt（Netscape 格式）"
-              readonly
-            />
-            <div class="field-actions">
-              <el-button type="info" @click="chooseCookiesFile()">选择文件</el-button>
-              <el-button plain @click="clearCookiesFile()">清除</el-button>
+              <el-icon><Monitor /></el-icon>
+              <span>跟随系统</span>
             </div>
-          </div>
-          <div
-            v-else-if="defaultCookiesMode === 'browser'"
-            class="field-content single with-top-gap"
-          >
-            <el-select
-              v-model="defaultCookiesBrowser"
-              placeholder="选择浏览器"
+            <div
+              class="theme-chip"
+              :class="{ 'is-selected': themeMode === 'light' }"
+              @click="themeMode = 'light'"
             >
-              <el-option
-                v-for="item in COOKIES_BROWSER_OPTIONS"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </div>
-          <p class="hint" v-if="defaultCookiesMode === 'file'">
-            用于下载需要登录、会员或私密权限的视频，建议导出 Netscape 格式的
-            cookies.txt。
-          </p>
-          <p class="hint" v-else-if="defaultCookiesMode === 'browser'">
-            直接从已登录浏览器读取 Cookies；如读取失败，先关闭浏览器再重试。
-          </p>
-          <p class="hint" v-else>不使用 Cookies，适合公开可访问内容。</p>
-        </div>
-
-        <div class="field">
-          <el-text class="label" tag="b">文件名模板</el-text>
-          <div class="field-content single">
-            <el-select
-              v-model="defaultFilenameTemplate"
-              placeholder="选择文件名模板"
+              <el-icon><Sunny /></el-icon>
+              <span>浅色模式</span>
+            </div>
+            <div
+              class="theme-chip"
+              :class="{ 'is-selected': themeMode === 'dark' }"
+              @click="themeMode = 'dark'"
             >
-              <el-option
-                v-for="item in FILENAME_TEMPLATE_OPTIONS"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </div>
-          <p class="hint">控制保存文件名的组成方式。</p>
-        </div>
-
-        <div class="field">
-          <el-text class="label" tag="b">下载参数</el-text>
-          <div class="field-content numeric">
-            <div class="number-field">
-              <el-text size="small">重试次数</el-text>
-              <el-input-number
-                v-model="defaultRetries"
-                :min="0"
-                :max="20"
-                controls-position="right"
-              />
-            </div>
-            <div class="number-field">
-              <el-text size="small">并发片段</el-text>
-              <el-input-number
-                v-model="defaultConcurrentFragments"
-                :min="1"
-                :max="16"
-                controls-position="right"
-              />
+              <el-icon><Moon /></el-icon>
+              <span>深色模式</span>
             </div>
           </div>
-          <p class="hint">重试次数同时用于普通重试和分片重试。</p>
-        </div>
+        </section>
 
-        <div class="field">
-          <el-text class="label" tag="b">代理设置</el-text>
-          <div class="field-content">
-            <el-input
-              v-model="defaultProxy"
-              placeholder="可选：http://127.0.0.1:7890"
-            />
-          </div>
-          <p class="hint">支持 HTTP/SOCKS5 代理配置。</p>
-        </div>
-      </section>
-
-      <el-divider />
-
-      <section class="section">
-        <div class="section-header-row">
-          <div class="section-title">环境依赖检测</div>
-          <el-button
-            size="small"
-            plain
-            :loading="isCheckingEnv"
-            @click="detectEnvironment"
-          >
-            <el-icon><Refresh /></el-icon>
-            重新检测
-          </el-button>
-        </div>
-        <div class="env-grid">
-          <div class="env-card">
-            <div class="env-top">
-              <span class="env-name">FFmpeg</span>
-              <el-tag
-                :type="envInfo.ffmpegAvailable ? 'success' : 'danger'"
-                size="small"
-                effect="light"
-                round
-              >
-                {{ envInfo.ffmpegAvailable ? "已检测到" : "未检测到" }}
-              </el-tag>
-            </div>
-            <div class="env-body">
-              <div v-if="envInfo.ffmpegAvailable" class="env-text">
-                版本：{{ envInfo.ffmpegVersion }}
-              </div>
-              <div v-else class="env-warn">
-                系统 PATH 未检测到 FFmpeg。高清音视频合并及 MP3 音频转码将不可用。
-              </div>
+        <!-- 2. 环境健康诊断 -->
+        <section class="config-card">
+          <div class="card-header-with-action">
+            <div>
+              <h3 class="card-title">环境健康诊断</h3>
+              <span class="card-desc">检测音视频转换与解析内核状态</span>
             </div>
             <el-button
-              v-if="!envInfo.ffmpegAvailable"
-              type="primary"
-              link
               size="small"
-              class="env-link"
-              @click="openUrl('https://ffmpeg.org/download.html')"
+              plain
+              class="refresh-btn"
+              :loading="isCheckingEnv"
+              @click="detectEnvironment"
             >
-              前往安装 FFmpeg →
+              <el-icon><Refresh /></el-icon>
+              重新检测
             </el-button>
           </div>
 
-          <div class="env-card">
-            <div class="env-top">
-              <span class="env-name">yt-dlp 内核</span>
-              <el-tag
-                :type="envInfo.ytdlpAvailable ? 'success' : 'danger'"
+          <div class="env-cards-row">
+            <div class="env-status-box">
+              <div class="env-top">
+                <span class="env-label">FFmpeg 转换器</span>
+                <el-tag
+                  :type="envInfo.ffmpegAvailable ? 'success' : 'danger'"
+                  size="small"
+                  effect="light"
+                  round
+                >
+                  {{ envInfo.ffmpegAvailable ? '已检测到' : '未检测到' }}
+                </el-tag>
+              </div>
+              <div class="env-info-text">
+                <span v-if="envInfo.ffmpegAvailable">版本: {{ envInfo.ffmpegVersion }}</span>
+                <span v-else class="env-warn-text">
+                  系统 PATH 未找到 ffmpeg，音视频合并与 MP3 转换可能受限。
+                </span>
+              </div>
+              <el-button
+                v-if="!envInfo.ffmpegAvailable"
+                type="primary"
+                link
                 size="small"
-                effect="light"
-                round
+                class="install-link"
+                @click="openUrl('https://ffmpeg.org/download.html')"
               >
-                {{ envInfo.ytdlpAvailable ? "已就绪" : "异常" }}
-              </el-tag>
+                前往安装 FFmpeg →
+              </el-button>
             </div>
-            <div class="env-body">
-              <div class="env-text">
-                版本：{{ envInfo.ytdlpVersion || "检测中..." }}
+
+            <div class="env-status-box">
+              <div class="env-top">
+                <span class="env-label">yt-dlp 解析内核</span>
+                <el-tag
+                  :type="envInfo.ytdlpAvailable ? 'success' : 'danger'"
+                  size="small"
+                  effect="light"
+                  round
+                >
+                  {{ envInfo.ytdlpAvailable ? '就绪' : '异常' }}
+                </el-tag>
+              </div>
+              <div class="env-info-text">
+                <span>版本: {{ envInfo.ytdlpVersion || "检测中..." }}</span>
               </div>
             </div>
           </div>
-        </div>
-        <p class="section-desc">FFmpeg 影响合并与音频转换；yt-dlp 为底层视频解析与下载内核。</p>
-      </section>
+        </section>
 
-      <el-divider />
+        <!-- 3. 下载默认规则 -->
+        <section class="config-card">
+          <div class="card-header">
+            <h3 class="card-title">下载默认值</h3>
+            <span class="card-desc">配置启动应用时的默认参数预设</span>
+          </div>
 
-      <section class="section">
-        <div class="section-title">其他</div>
-        <div class="field inline">
-          <el-text class="label" tag="b">下载完成后打开目录</el-text>
-          <el-switch v-model="autoOpenDir" />
-        </div>
-        <div class="field inline">
-          <el-text class="label" tag="b">启动时自动粘贴剪贴板 URL</el-text>
-          <el-switch v-model="autoPasteClipboard" />
-        </div>
-        <div class="field inline">
-          <el-text class="label" tag="b">重置所有设置</el-text>
-          <el-button type="danger" plain @click="resetAll()">重置</el-button>
-        </div>
-      </section>
-    </el-card>
+          <div class="fields-list">
+            <!-- 默认保存目录 -->
+            <div class="form-row">
+              <div class="row-info">
+                <span class="row-label">默认保存目录</span>
+                <span class="row-desc">未指定时默认使用系统 Downloads 目录</span>
+              </div>
+              <div class="row-control-wide">
+                <el-input
+                  v-model="defaultDir"
+                  placeholder="系统 Downloads 目录"
+                  readonly
+                  size="default"
+                >
+                  <template #prefix>
+                    <el-icon><Folder /></el-icon>
+                  </template>
+                </el-input>
+                <el-button size="default" @click="chooseDir">选择</el-button>
+                <el-button v-if="defaultDir" size="default" text class="clear-btn" @click="clearDir">
+                  清除
+                </el-button>
+              </div>
+            </div>
+
+            <!-- 默认格式与命名模板 -->
+            <div class="form-grid-two">
+              <div class="form-col">
+                <span class="row-label">默认下载格式</span>
+                <el-select v-model="defaultFormat" size="default" class="full-width">
+                  <el-option
+                    v-for="item in FORMAT_OPTIONS"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+              </div>
+              <div class="form-col">
+                <span class="row-label">默认文件名模板</span>
+                <el-select v-model="defaultFilenameTemplate" size="default" class="full-width">
+                  <el-option
+                    v-for="item in FILENAME_TEMPLATE_OPTIONS"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+              </div>
+            </div>
+
+            <!-- Cookies 默认来源 -->
+            <div class="form-row">
+              <div class="row-info">
+                <span class="row-label">Cookies 登录态来源</span>
+                <span class="row-desc">用于会员或限制访问内容的认证</span>
+              </div>
+              <div class="row-control-stack">
+                <el-select v-model="defaultCookiesMode" size="default" class="full-width">
+                  <el-option
+                    v-for="item in COOKIES_MODE_OPTIONS"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+
+                <div v-if="defaultCookiesMode === 'browser'" class="sub-row">
+                  <el-select
+                    v-model="defaultCookiesBrowser"
+                    size="default"
+                    class="full-width"
+                    placeholder="选择目标浏览器"
+                  >
+                    <el-option
+                      v-for="item in COOKIES_BROWSER_OPTIONS"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value"
+                    />
+                  </el-select>
+                </div>
+
+                <div v-else-if="defaultCookiesMode === 'file'" class="sub-row row-control-wide">
+                  <el-input
+                    v-model="defaultCookiesPath"
+                    placeholder="未选择 cookies.txt"
+                    readonly
+                    size="default"
+                  />
+                  <el-button size="default" @click="chooseCookiesFile">选择</el-button>
+                  <el-button v-if="defaultCookiesPath" size="default" text class="clear-btn" @click="clearCookiesFile">
+                    清除
+                  </el-button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 重试与分片 -->
+            <div class="form-grid-two">
+              <div class="form-col">
+                <span class="row-label">重试次数 (0-20)</span>
+                <el-input-number
+                  v-model="defaultRetries"
+                  :min="0"
+                  :max="20"
+                  size="default"
+                  controls-position="right"
+                  class="full-width"
+                />
+              </div>
+              <div class="form-col">
+                <span class="row-label">并发分片数 (1-16)</span>
+                <el-input-number
+                  v-model="defaultConcurrentFragments"
+                  :min="1"
+                  :max="16"
+                  size="default"
+                  controls-position="right"
+                  class="full-width"
+                />
+              </div>
+            </div>
+
+            <!-- 网络代理 -->
+            <div class="form-row">
+              <div class="row-info">
+                <span class="row-label">默认网络代理</span>
+                <span class="row-desc">支持 HTTP / SOCKS5，例如 http://127.0.0.1:7890</span>
+              </div>
+              <div class="row-control-wide">
+                <el-input
+                  v-model="defaultProxy"
+                  placeholder="可选: http://127.0.0.1:7890"
+                  clearable
+                  size="default"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. 偏好与系统 -->
+        <section class="config-card">
+          <div class="card-header">
+            <h3 class="card-title">快捷偏好</h3>
+            <span class="card-desc">日常使用体验优化</span>
+          </div>
+
+          <div class="switch-list">
+            <div class="switch-row">
+              <div class="switch-info">
+                <span class="switch-title">下载完成后自动打开目标文件夹</span>
+                <span class="switch-desc">任务下载成功后直接在系统文件管理器中展示</span>
+              </div>
+              <el-switch v-model="autoOpenDir" />
+            </div>
+
+            <div class="switch-row">
+              <div class="switch-info">
+                <span class="switch-title">启动时自动粘贴剪贴板中的视频链接</span>
+                <span class="switch-desc">启动软件若剪贴板有合规 URL 则自动填充至输入框</span>
+              </div>
+              <el-switch v-model="autoPasteClipboard" />
+            </div>
+
+            <div class="switch-row danger-zone">
+              <div class="switch-info">
+                <span class="switch-title danger-text">重置所有配置</span>
+                <span class="switch-desc">清空所有持久化的下载预设与偏好设置</span>
+              </div>
+              <el-popconfirm
+                title="确定恢复所有设置为出厂默认值吗？"
+                confirm-button-text="确定重置"
+                cancel-button-text="取消"
+                confirm-button-type="danger"
+                @confirm="resetAll"
+              >
+                <template #reference>
+                  <el-button type="danger" plain size="small">重置设置</el-button>
+                </template>
+              </el-popconfirm>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.main {
-  display: flex;
-  flex-direction: column;
-  align-items: start;
+.settings-page {
   width: 100%;
+  min-height: 100%;
+  padding: 1.5rem 1.75rem 2.5rem;
 }
 
-.main .title {
-  margin: 0.8em 0em 0.6em 0.6em;
-}
-
-.settings-card {
-  width: min(90%, 780px);
-  max-width: 780px;
+.page-container {
+  width: 100%;
+  max-width: 860px;
   margin: 0 auto;
-  border-radius: 12px;
-  background-color: var(--bg-secondary);
-  border-color: var(--border-color);
 }
 
-.section {
+.page-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.topbar-title-group {
   display: flex;
   flex-direction: column;
-  gap: 0.8em;
+  align-items: flex-start;
+  gap: 0.2rem;
 }
 
-.section-title {
-  font-size: 1.05em;
-  font-weight: 600;
+.page-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
-.section-header-row {
+.page-subtitle {
+  font-size: 0.84rem;
+  color: var(--text-tertiary);
+}
+
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+/* 配置卡片 */
+.config-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.4rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+.card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.card-header-with-action {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.env-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85em;
+.card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
-.env-card {
-  padding: 0.9em 1.1em;
-  border-radius: 8px;
-  background-color: color-mix(in srgb, var(--bg-primary) 70%, var(--bg-secondary));
-  border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
+.card-desc {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+}
+
+/* 主题分段按钮 */
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.theme-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-chip:hover {
+  background-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.theme-chip.is-selected {
+  background-color: var(--primary-subtle);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* 环境诊断卡片行 */
+.env-cards-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.env-status-box {
+  padding: 0.95rem 1.15rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
-  gap: 0.5em;
-  text-align: left;
+  gap: 0.45rem;
 }
 
 .env-top {
@@ -546,153 +699,154 @@ function resetAll() {
   align-items: center;
 }
 
-.env-name {
+.env-label {
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-primary);
-  font-size: 0.95em;
 }
 
-.env-body {
-  min-height: 2.2em;
-  display: flex;
-  align-items: center;
-}
-
-.env-text {
-  font-size: 0.86em;
+.env-info-text {
+  font-size: 0.82rem;
   color: var(--text-secondary);
-  word-break: break-all;
 }
 
-.env-warn {
-  font-size: 0.82em;
+.env-warn-text {
   color: var(--danger-color);
   line-height: 1.4;
 }
 
-.env-link {
+.install-link {
   align-self: flex-start;
   padding: 0;
-  margin-top: 0.1em;
+  font-size: 0.8rem;
 }
 
-.section-desc,
-.hint {
-  margin: 0;
-  color: var(--text-tertiary);
-  font-size: 0.9em;
-}
-
-.field {
+/* 字段列表 */
+.fields-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5em;
+  gap: 1rem;
 }
 
-.field.inline {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.field-content {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  grid-gap: 0.75em;
-  align-items: center;
-}
-
-.dir-field {
-  grid-template-columns: 1fr auto;
-}
-
-.field-actions {
+.form-row {
   display: flex;
-  gap: 0.75em;
+  justify-content: space-between;
   align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
-.field-actions .el-button {
-  margin-left: 0;
+.row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 220px;
 }
 
-.field-content.single {
-  grid-template-columns: 1fr;
+.row-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
-.field-content.numeric {
-  grid-template-columns: repeat(2, minmax(10em, 1fr));
+.row-desc {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
 }
 
-.with-top-gap {
-  margin-top: 0.5em;
+.row-control-wide {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1.4;
+  min-width: 260px;
 }
 
-.number-field {
+.row-control-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1.4;
+  min-width: 260px;
+}
+
+.form-grid-two {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.5em;
-  align-items: center;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }
 
-.number-field .el-input-number {
+.form-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.full-width {
   width: 100%;
 }
 
-.label {
-  color: var(--text-primary);
-  font-weight: 500;
+.clear-btn {
+  color: var(--danger-color);
 }
 
-@media (max-width: 800px) {
-  .main {
+/* 开关行 */
+.switch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.switch-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-tertiary);
+}
+
+.switch-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.switch-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.switch-desc {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+
+.danger-text {
+  color: var(--danger-color);
+}
+
+@media (max-width: 640px) {
+  .settings-page {
+    padding: 1rem 0.75rem 2rem;
+  }
+
+  .theme-options,
+  .env-cards-row,
+  .form-grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    flex-direction: column;
     align-items: stretch;
   }
 
-  .settings-card {
-    width: calc(100% - 1.2em);
-  }
-
-  .field-content,
-  .dir-field,
-  .field-content.numeric,
-  .env-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .field-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .field-actions .el-button {
+  .row-control-wide,
+  .row-control-stack {
     width: 100%;
-  }
-
-  .field.inline {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0.6em;
-  }
-
-  .number-field {
-    grid-template-columns: 5em minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 460px) {
-  .field-actions,
-  .field.inline {
-    grid-template-columns: 1fr;
-  }
-
-  .field.inline {
-    align-items: start;
-  }
-
-  .number-field {
-    grid-template-columns: 1fr;
-    gap: 0.35em;
   }
 }
 </style>

@@ -553,181 +553,137 @@ onUnmounted(() => {
 
 <template>
   <div class="home-page">
-    <div class="logo-container">
-      <img src="../../src-tauri/icons/logo.png" class="logo" alt="logo" />
+    <div class="page-container">
+      <!-- 页面顶部简要标题栏 -->
+      <header class="page-topbar">
+        <div class="topbar-title-group">
+          <h2 class="page-title">下载中心</h2>
+          <span class="page-subtitle">支持主流音视频平台多线程解析与批量提取</span>
+        </div>
+        <el-tag size="small" type="primary" effect="plain" round class="version-tag">
+          {{ version }}
+        </el-tag>
+      </header>
+
+      <!-- 主工作区 -->
+      <div class="workspace-stack">
+        <!-- 1. 进度指示卡片 (仅非 idle 状态展示) -->
+        <DownloadProgress
+          v-if="downloadStatus !== 'idle'"
+          :download-status="downloadStatus"
+          :progress="progress"
+          :is-downloading="isDownloading"
+          :current-file="currentFile"
+          :download-speed="downloadSpeed"
+          :eta="eta"
+          :queue-index="queueIndex"
+          :queue-total="queueTotal"
+          :success-count="successCount"
+          :failed-items="failedItems"
+          :error="error"
+          :error-tips="errorTips"
+          @clear-error="error = ''"
+          @retry-failed="retryFailed"
+        />
+
+        <!-- 2. 智能输入卡片 -->
+        <DownloadForm
+          v-model:url="url"
+          :is-previewing="isPreviewing"
+          :is-downloading="isDownloading"
+          :is-cancelling="isCancelling"
+          @preview="previewInfo"
+          @download="download"
+          @cancel="cancelDownload"
+        />
+
+        <!-- 3. 常用选项栏与折叠高级参数 -->
+        <DownloadOptions
+          v-model:dir="dir"
+          v-model:cookies-mode="cookiesMode"
+          v-model:cookies-path="cookiesPath"
+          v-model:cookies-browser="cookiesBrowser"
+          v-model:format-preset="formatPreset"
+          v-model:filename-template="filenameTemplate"
+          v-model:retries="retries"
+          v-model:concurrent-fragments="concurrentFragments"
+          v-model:proxy="proxy"
+          :is-downloading="isDownloading"
+          @choose-dir="chooseDir"
+          @choose-cookies="chooseCookiesFile"
+          @clear-cookies="clearCookiesFile"
+        />
+
+        <!-- 4. 视频信息预览结果面板 -->
+        <PreviewPanel
+          :is-previewing="isPreviewing"
+          :preview-items="previewItems"
+        />
+      </div>
     </div>
-    <h1 class="appname">
-      视频下载器
-      <el-tag type="primary" effect="dark" round>{{ version }}</el-tag>
-    </h1>
-
-    <el-card class="main-card" shadow="hover">
-      <DownloadProgress
-        :download-status="downloadStatus"
-        :progress="progress"
-        :is-downloading="isDownloading"
-        :current-file="currentFile"
-        :download-speed="downloadSpeed"
-        :eta="eta"
-        :queue-index="queueIndex"
-        :queue-total="queueTotal"
-        :success-count="successCount"
-        :failed-items="failedItems"
-        :error="error"
-        :error-tips="errorTips"
-        @clear-error="error = ''"
-        @retry-failed="retryFailed"
-      />
-      <DownloadForm
-        v-model:url="url"
-        :is-previewing="isPreviewing"
-        :is-downloading="isDownloading"
-        :is-cancelling="isCancelling"
-        @preview="previewInfo"
-        @download="download"
-        @cancel="cancelDownload"
-      />
-      <PreviewPanel
-        :is-previewing="isPreviewing"
-        :preview-items="previewItems"
-      />
-      <el-divider />
-      <DownloadOptions
-        v-model:dir="dir"
-        v-model:cookies-mode="cookiesMode"
-        v-model:cookies-path="cookiesPath"
-        v-model:cookies-browser="cookiesBrowser"
-        v-model:format-preset="formatPreset"
-        v-model:filename-template="filenameTemplate"
-        v-model:retries="retries"
-        v-model:concurrent-fragments="concurrentFragments"
-        v-model:proxy="proxy"
-        :is-downloading="isDownloading"
-        @choose-dir="chooseDir"
-        @choose-cookies="chooseCookiesFile"
-        @clear-cookies="clearCookiesFile"
-      />
-    </el-card>
-
-    <footer class="footer">
-      <p>
-        © 2025 by
-        <a target="_blank" href="https://github.com/LongYinStudio"
-          >LongYinStudio</a
-        >
-      </p>
-    </footer>
   </div>
 </template>
 
 <style scoped>
 .home-page {
   width: 100%;
-  min-width: 0;
-  padding-bottom: 2rem;
+  min-height: 100%;
+  padding: 1.5rem 1.75rem 2.5rem;
 }
 
-.logo-container {
-  margin-top: 2.5em;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.logo {
-  height: 7em;
-  width: 7em;
-  border-radius: 1.5em;
-  transition: all 0.4s ease;
-  box-shadow: var(--shadow-md);
-  object-fit: cover;
-}
-
-.logo:hover {
-  transform: scale(1.05);
-  box-shadow: var(--shadow-lg);
-  filter: drop-shadow(0 0 2em #030040);
-}
-
-.appname {
-  padding: 1em 0;
-  font-size: 2em;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5em;
-  color: var(--text-primary);
-}
-
-h1 {
-  text-align: center;
-  margin: 0;
-}
-
-.main-card {
-  width: min(90%, 700px);
-  max-width: 700px;
-  margin: 1.5em auto;
-  border-radius: 12px;
-  background-color: var(--bg-secondary);
-  border-color: var(--border-color);
-}
-
-.footer {
+.page-container {
   width: 100%;
-  text-align: center;
-  padding: 1.5em 1em;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.page-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.topbar-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.page-subtitle {
+  font-size: 0.84rem;
   color: var(--text-tertiary);
-  font-size: 0.9em;
 }
 
-.footer a {
-  color: var(--primary-color);
-  text-decoration: none;
-  transition: color 0.3s;
+.version-tag {
+  font-weight: 600;
+  font-size: 0.78rem;
 }
 
-.footer a:hover {
-  color: var(--primary-hover);
-  text-decoration: underline;
+.workspace-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
-@media (max-width: 720px) {
-  .logo-container {
-    margin-top: 1.2em;
+@media (max-width: 640px) {
+  .home-page {
+    padding: 1rem 0.75rem 2rem;
   }
 
-  .logo {
-    width: 5em;
-    height: 5em;
-    border-radius: 1.1em;
-  }
-
-  .appname {
-    padding: 0.8em 0;
-    font-size: 1.5em;
-  }
-
-  .main-card {
-    width: calc(100% - 1em);
-    margin: 0.75em auto;
-  }
-
-}
-
-/* 深色模式特定调整 */
-@media (prefers-color-scheme: dark) {
-  .logo {
-    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-  }
-
-  .logo:hover {
-    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
-  }
-
-  .main-card {
-    box-shadow: var(--shadow-lg);
+  .page-topbar {
+    align-items: flex-start;
   }
 }
 </style>
