@@ -6,6 +6,16 @@
   "permissions": [
     "core:default",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        { "path": "**" },
+        { "path": "/**" },
+        { "path": "$HOME/**" },
+        { "path": "$DOWNLOAD/**" }
+      ]
+    },
+    "opener:allow-reveal-item-in-dir",
     "shell:allow-open",
     "core:app:allow-set-app-theme",
     "dialog:default"

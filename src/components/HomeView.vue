@@ -4,8 +4,9 @@ import { listen } from "@tauri-apps/api/event";
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { downloadDir } from "@tauri-apps/api/path";
+import { ElMessage } from "element-plus";
 import { version } from "../utils.js";
 import { addHistoryItem } from "../history.js";
 import {
@@ -360,13 +361,20 @@ async function download(customUrls = null) {
         try {
           targetDir = await downloadDir();
         } catch (dirErr) {
-          error.value = getErrorMessage(dirErr);
+          console.warn("获取默认下载目录失败:", dirErr);
         }
       }
       try {
-        if (targetDir) await openPath(targetDir);
+        if (targetDir) {
+          try {
+            await openPath(targetDir);
+          } catch (pErr) {
+            await revealItemInDir(targetDir);
+          }
+        }
       } catch (openErr) {
-        error.value = getErrorMessage(openErr);
+        console.warn("自动打开目录失败:", openErr);
+        ElMessage.warning(`自动打开目录失败: ${getErrorMessage(openErr)}`);
       }
     }
   }

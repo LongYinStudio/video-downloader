@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { ElMessage } from "element-plus";
 import {
   Clock,
@@ -61,11 +61,15 @@ async function handleOpenDir(filePath) {
     return;
   }
   try {
-    const lastSlash = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
-    const dirPath = lastSlash > 0 ? filePath.substring(0, lastSlash) : filePath;
-    await openPath(dirPath);
+    await revealItemInDir(filePath);
   } catch (err) {
-    ElMessage.error(`打开目录失败: ${err?.message || err}`);
+    try {
+      const lastSlash = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
+      const dirPath = lastSlash > 0 ? filePath.substring(0, lastSlash) : filePath;
+      await openPath(dirPath);
+    } catch (fallbackErr) {
+      ElMessage.error(`打开目录失败: ${fallbackErr?.message || fallbackErr}`);
+    }
   }
 }
 
