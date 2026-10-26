@@ -1,5 +1,6 @@
 export const STORAGE_KEYS = {
   theme: "vd.theme",
+  language: "vd.language",
   dir: "vd.dir",
   proxy: "vd.proxy",
   cookiesMode: "vd.cookies_mode",
@@ -21,6 +22,16 @@ export const FORMAT_OPTIONS = [
   { label: "仅音频 MP3", value: "audio" },
 ];
 
+export function getFormatOptions(t) {
+  return [
+    { label: t("options.format.best"), value: "best" },
+    { label: t("options.format.p1080"), value: "1080p" },
+    { label: t("options.format.p720"), value: "720p" },
+    { label: t("options.format.p480"), value: "480p" },
+    { label: t("options.format.audio"), value: "audio" },
+  ];
+}
+
 export const FILENAME_TEMPLATE_OPTIONS = [
   { label: "标题", value: "title" },
   { label: "标题 + ID", value: "title_id" },
@@ -28,11 +39,28 @@ export const FILENAME_TEMPLATE_OPTIONS = [
   { label: "日期 + 标题", value: "date_title" },
 ];
 
+export function getFilenameTemplateOptions(t) {
+  return [
+    { label: t("options.filename.title"), value: "title" },
+    { label: t("options.filename.title_id"), value: "title_id" },
+    { label: t("options.filename.uploader_title"), value: "uploader_title" },
+    { label: t("options.filename.date_title"), value: "date_title" },
+  ];
+}
+
 export const COOKIES_MODE_OPTIONS = [
   { label: "不使用", value: "none" },
   { label: "cookies.txt 文件", value: "file" },
   { label: "从浏览器读取", value: "browser" },
 ];
+
+export function getCookiesModeOptions(t) {
+  return [
+    { label: t("options.cookiesMode.none"), value: "none" },
+    { label: t("options.cookiesMode.file"), value: "file" },
+    { label: t("options.cookiesMode.browser"), value: "browser" },
+  ];
+}
 
 export const COOKIES_BROWSER_OPTIONS = [
   { label: "Chrome", value: "chrome" },
@@ -44,6 +72,12 @@ export const COOKIES_BROWSER_OPTIONS = [
   { label: "Vivaldi", value: "vivaldi" },
   { label: "Safari", value: "safari" },
   { label: "Whale", value: "whale" },
+];
+
+export const LANGUAGE_OPTIONS = [
+  { label: "简体中文", value: "zh-CN" },
+  { label: "English", value: "en-US" },
+  { label: "Português (Brasil)", value: "pt-BR" },
 ];
 
 export const DEFAULT_DOWNLOAD_OPTIONS = {

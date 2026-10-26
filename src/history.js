@@ -26,10 +26,11 @@ export function addHistoryItem({
   format = "",
 }) {
   const history = getHistory();
+  const currentLocale = localStorage.getItem("vd.language") || "zh-CN";
   const newItem = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     timestamp: Date.now(),
-    dateStr: new Date().toLocaleString("zh-CN", {
+    dateStr: new Date().toLocaleString(currentLocale, {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

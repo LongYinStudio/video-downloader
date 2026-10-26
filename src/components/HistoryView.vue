@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { ElMessage } from "element-plus";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@element-plus/icons-vue";
 import { clearHistory, getHistory, removeHistoryItem } from "../history.js";
 
+const { t } = useI18n();
 const router = useRouter();
 const historyList = ref([]);
 const searchQuery = ref("");
@@ -45,19 +47,19 @@ const filteredList = computed(() => {
 
 async function handleOpenFile(filePath) {
   if (!filePath) {
-    ElMessage.warning("未记录文件路径");
+    ElMessage.warning(t("history.noFilePath"));
     return;
   }
   try {
     await openPath(filePath);
   } catch (err) {
-    ElMessage.error(`打开文件失败: ${err?.message || err}`);
+    ElMessage.error(t("history.openFileError", { error: err?.message || err }));
   }
 }
 
 async function handleOpenDir(filePath) {
   if (!filePath) {
-    ElMessage.warning("未记录文件路径");
+    ElMessage.warning(t("history.noFilePath"));
     return;
   }
   try {
@@ -68,7 +70,7 @@ async function handleOpenDir(filePath) {
       const dirPath = lastSlash > 0 ? filePath.substring(0, lastSlash) : filePath;
       await openPath(dirPath);
     } catch (fallbackErr) {
-      ElMessage.error(`打开目录失败: ${fallbackErr?.message || fallbackErr}`);
+      ElMessage.error(t("history.openDirError", { error: fallbackErr?.message || fallbackErr }));
     }
   }
 }
@@ -77,9 +79,9 @@ async function handleCopyUrl(url) {
   if (!url) return;
   try {
     await navigator.clipboard.writeText(url);
-    ElMessage.success("链接已复制到剪贴板");
+    ElMessage.success(t("history.urlCopied"));
   } catch {
-    ElMessage.error("复制失败");
+    ElMessage.error(t("history.copyError"));
   }
 }
 
@@ -92,25 +94,25 @@ function handleRedownload(item) {
 
 function handleDeleteItem(id) {
   historyList.value = removeHistoryItem(id);
-  ElMessage.success("已删除此条记录");
+  ElMessage.success(t("history.deleted"));
 }
 
 function handleClearAll() {
   clearHistory();
   historyList.value = [];
-  ElMessage.success("历史记录已清空");
+  ElMessage.success(t("history.cleared"));
 }
 
 function getStatusTag(status) {
   switch (status) {
     case "success":
-      return { type: "success", text: "已完成" };
+      return { type: "success", text: t("history.statusCompleted") };
     case "failed":
-      return { type: "danger", text: "下载失败" };
+      return { type: "danger", text: t("history.statusFailed") };
     case "cancelled":
-      return { type: "warning", text: "已取消" };
+      return { type: "warning", text: t("history.statusCancelled") };
     default:
-      return { type: "info", text: status || "未知" };
+      return { type: "info", text: status || t("history.statusUnknown") };
   }
 }
 </script>
@@ -121,14 +123,14 @@ function getStatusTag(status) {
       <!-- 页面顶部标题栏 -->
       <header class="page-topbar">
         <div class="topbar-title-group">
-          <h2 class="page-title">下载历史</h2>
-          <span class="page-subtitle">查看与管理过去下载的本地文件与记录</span>
+          <h2 class="page-title">{{ t("history.title") }}</h2>
+          <span class="page-subtitle">{{ t("history.subtitle") }}</span>
         </div>
         <div class="topbar-actions">
           <el-popconfirm
-            title="确定清空所有下载历史记录吗？"
-            confirm-button-text="确定清空"
-            cancel-button-text="取消"
+            :title="t('history.clearConfirm')"
+            :confirm-button-text="t('history.confirmClear')"
+            :cancel-button-text="t('history.cancel')"
             confirm-button-type="danger"
             @confirm="handleClearAll"
           >
@@ -141,7 +143,7 @@ function getStatusTag(status) {
                 :disabled="historyList.length === 0"
               >
                 <el-icon><Delete /></el-icon>
-                清空历史
+                {{ t("history.clearBtn") }}
               </el-button>
             </template>
           </el-popconfirm>
@@ -152,7 +154,7 @@ function getStatusTag(status) {
       <div class="filter-card">
         <el-input
           v-model="searchQuery"
-          placeholder="搜索视频标题、链接或本地文件路径..."
+          :placeholder="t('history.searchPlaceholder')"
           prefix-icon="Search"
           clearable
           size="default"
@@ -164,28 +166,28 @@ function getStatusTag(status) {
             :class="{ active: statusFilter === 'all' }"
             @click="statusFilter = 'all'"
           >
-            全部 ({{ historyList.length }})
+            {{ t("history.filterAll", { count: historyList.length }) }}
           </div>
           <div
             class="filter-pill"
             :class="{ active: statusFilter === 'success' }"
             @click="statusFilter = 'success'"
           >
-            成功 ({{ historyList.filter(i => i.status === 'success').length }})
+            {{ t("history.filterSuccess", { count: historyList.filter(i => i.status === 'success').length }) }}
           </div>
           <div
             class="filter-pill"
             :class="{ active: statusFilter === 'failed' }"
             @click="statusFilter = 'failed'"
           >
-            失败 ({{ historyList.filter(i => i.status === 'failed').length }})
+            {{ t("history.filterFailed", { count: historyList.filter(i => i.status === 'failed').length }) }}
           </div>
         </div>
       </div>
 
       <!-- 历史记录列表 -->
       <div v-if="filteredList.length === 0" class="empty-card">
-        <el-empty description="暂无历史记录" />
+        <el-empty :description="t('history.empty')" />
       </div>
 
       <div v-else class="history-cards-stack">
@@ -234,36 +236,36 @@ function getStatusTag(status) {
             </div>
 
             <div v-if="item.error && item.status === 'failed'" class="item-error-box">
-              <span>失败原因：{{ item.error }}</span>
+              <span>{{ t("history.failReason", { reason: item.error }) }}</span>
             </div>
           </div>
 
           <div class="item-action-btns">
-            <el-tooltip v-if="item.status === 'success' && item.file" content="打开视频文件" placement="top">
+            <el-tooltip v-if="item.status === 'success' && item.file" :content="t('history.tooltipOpenFile')" placement="top">
               <button class="action-circle-btn primary" @click="handleOpenFile(item.file)">
                 <el-icon><VideoPlay /></el-icon>
               </button>
             </el-tooltip>
 
-            <el-tooltip v-if="item.file" content="定位所在文件夹" placement="top">
+            <el-tooltip v-if="item.file" :content="t('history.tooltipOpenDir')" placement="top">
               <button class="action-circle-btn" @click="handleOpenDir(item.file)">
                 <el-icon><FolderOpened /></el-icon>
               </button>
             </el-tooltip>
 
-            <el-tooltip content="复制视频链接" placement="top">
+            <el-tooltip :content="t('history.tooltipCopyUrl')" placement="top">
               <button class="action-circle-btn" @click="handleCopyUrl(item.url)">
                 <el-icon><Link /></el-icon>
               </button>
             </el-tooltip>
 
-            <el-tooltip content="重新下载" placement="top">
+            <el-tooltip :content="t('history.tooltipRedownload')" placement="top">
               <button class="action-circle-btn success" @click="handleRedownload(item)">
                 <el-icon><Refresh /></el-icon>
               </button>
             </el-tooltip>
 
-            <el-tooltip content="删除记录" placement="top">
+            <el-tooltip :content="t('history.tooltipDelete')" placement="top">
               <button class="action-circle-btn danger" @click="handleDeleteItem(item.id)">
                 <el-icon><Delete /></el-icon>
               </button>

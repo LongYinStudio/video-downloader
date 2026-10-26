@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 import {
   Menu as IconMenu,
   Clock,
@@ -11,9 +12,15 @@ import {
   VideoCameraFilled,
 } from "@element-plus/icons-vue";
 import { STORAGE_KEYS } from "./settings.js";
+import { elementLocales } from "./i18n/index.js";
 
 const route = useRoute();
+const { t, locale } = useI18n();
 const isCollapse = ref(false);
+
+const currentElementLocale = computed(() => {
+  return elementLocales[locale.value] || elementLocales["en-US"];
+});
 
 function applyTheme(mode) {
   const root = document.documentElement;
@@ -28,82 +35,84 @@ applyTheme(localStorage.getItem(STORAGE_KEYS.theme) || "system");
 </script>
 
 <template>
-  <main class="app-layout">
-    <aside class="app-sidebar" :class="{ 'is-collapsed': isCollapse }">
-      <div class="sidebar-brand">
-        <div class="brand-logo-wrap">
-          <img src="../src-tauri/icons/logo.png" alt="logo" class="brand-logo" />
+  <el-config-provider :locale="currentElementLocale">
+    <main class="app-layout">
+      <aside class="app-sidebar" :class="{ 'is-collapsed': isCollapse }">
+        <div class="sidebar-brand">
+          <div class="brand-logo-wrap">
+            <img src="../src-tauri/icons/logo.png" alt="logo" class="brand-logo" />
+          </div>
+          <div v-show="!isCollapse" class="brand-text">
+            <span class="brand-name">{{ t("app.name") }}</span>
+            <span class="brand-sub">{{ t("app.subtitle") }}</span>
+          </div>
         </div>
-        <div v-show="!isCollapse" class="brand-text">
-          <span class="brand-name">视频下载器</span>
-          <span class="brand-sub">Downloader</span>
+
+        <nav class="sidebar-nav">
+          <router-link
+            to="/"
+            class="nav-item"
+            :class="{ active: route.path === '/' }"
+            :title="isCollapse ? t('nav.home') : ''"
+          >
+            <el-icon class="nav-icon"><VideoCameraFilled /></el-icon>
+            <span v-show="!isCollapse" class="nav-label">{{ t("nav.home") }}</span>
+          </router-link>
+
+          <router-link
+            to="/history"
+            class="nav-item"
+            :class="{ active: route.path === '/history' }"
+            :title="isCollapse ? t('nav.history') : ''"
+          >
+            <el-icon class="nav-icon"><Clock /></el-icon>
+            <span v-show="!isCollapse" class="nav-label">{{ t("nav.history") }}</span>
+          </router-link>
+
+          <router-link
+            to="/settings"
+            class="nav-item"
+            :class="{ active: route.path === '/settings' }"
+            :title="isCollapse ? t('nav.settings') : ''"
+          >
+            <el-icon class="nav-icon"><Setting /></el-icon>
+            <span v-show="!isCollapse" class="nav-label">{{ t("nav.settings") }}</span>
+          </router-link>
+
+          <router-link
+            to="/about"
+            class="nav-item"
+            :class="{ active: route.path === '/about' }"
+            :title="isCollapse ? t('nav.about') : ''"
+          >
+            <el-icon class="nav-icon"><InfoFilled /></el-icon>
+            <span v-show="!isCollapse" class="nav-label">{{ t("nav.about") }}</span>
+          </router-link>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button
+            class="collapse-toggle-btn"
+            :title="isCollapse ? t('nav.expandSidebar') : t('nav.collapseSidebar')"
+            @click="isCollapse = !isCollapse"
+          >
+            <el-icon class="toggle-icon">
+              <component :is="isCollapse ? Expand : Fold" />
+            </el-icon>
+            <span v-show="!isCollapse" class="toggle-text">{{ t("nav.collapse") }}</span>
+          </button>
         </div>
+      </aside>
+
+      <div class="app-main">
+        <router-view v-slot="{ Component }">
+          <transition name="fade-slide" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </div>
-
-      <nav class="sidebar-nav">
-        <router-link
-          to="/"
-          class="nav-item"
-          :class="{ active: route.path === '/' }"
-          :title="isCollapse ? '下载首页' : ''"
-        >
-          <el-icon class="nav-icon"><VideoCameraFilled /></el-icon>
-          <span v-show="!isCollapse" class="nav-label">下载首页</span>
-        </router-link>
-
-        <router-link
-          to="/history"
-          class="nav-item"
-          :class="{ active: route.path === '/history' }"
-          :title="isCollapse ? '下载历史' : ''"
-        >
-          <el-icon class="nav-icon"><Clock /></el-icon>
-          <span v-show="!isCollapse" class="nav-label">下载历史</span>
-        </router-link>
-
-        <router-link
-          to="/settings"
-          class="nav-item"
-          :class="{ active: route.path === '/settings' }"
-          :title="isCollapse ? '参数设置' : ''"
-        >
-          <el-icon class="nav-icon"><Setting /></el-icon>
-          <span v-show="!isCollapse" class="nav-label">参数设置</span>
-        </router-link>
-
-        <router-link
-          to="/about"
-          class="nav-item"
-          :class="{ active: route.path === '/about' }"
-          :title="isCollapse ? '关于软件' : ''"
-        >
-          <el-icon class="nav-icon"><InfoFilled /></el-icon>
-          <span v-show="!isCollapse" class="nav-label">关于软件</span>
-        </router-link>
-      </nav>
-
-      <div class="sidebar-footer">
-        <button
-          class="collapse-toggle-btn"
-          :title="isCollapse ? '展开侧边栏' : '收起侧边栏'"
-          @click="isCollapse = !isCollapse"
-        >
-          <el-icon class="toggle-icon">
-            <component :is="isCollapse ? Expand : Fold" />
-          </el-icon>
-          <span v-show="!isCollapse" class="toggle-text">收起侧栏</span>
-        </button>
-      </div>
-    </aside>
-
-    <div class="app-main">
-      <router-view v-slot="{ Component }">
-        <transition name="fade-slide" mode="out-in">
-          <component :is="Component" />
-        </transition>
-      </router-view>
-    </div>
-  </main>
+    </main>
+  </el-config-provider>
 </template>
 
 <style>

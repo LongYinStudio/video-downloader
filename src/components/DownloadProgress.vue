@@ -1,4 +1,5 @@
 <script setup>
+import { useI18n } from "vue-i18n";
 import { Loading, CircleCheck, CircleClose, Warning, Refresh, VideoPlay } from "@element-plus/icons-vue";
 
 defineProps({
@@ -53,6 +54,7 @@ defineProps({
 });
 
 const emit = defineEmits(["clear-error", "retry-failed"]);
+const { t } = useI18n();
 </script>
 
 <template>
@@ -68,7 +70,7 @@ const emit = defineEmits(["clear-error", "retry-failed"]);
           class="status-tag"
         >
           <el-icon class="is-loading"><Loading /></el-icon>
-          正在下载 {{ queueTotal > 1 ? `(${queueIndex}/${queueTotal})` : '' }}
+          {{ queueTotal > 1 ? t('progress.downloadingQueue', { index: queueIndex, total: queueTotal }) : t('progress.downloading') }}
         </el-tag>
 
         <el-tag
@@ -79,7 +81,7 @@ const emit = defineEmits(["clear-error", "retry-failed"]);
           class="status-tag"
         >
           <el-icon><CircleCheck /></el-icon>
-          {{ queueTotal > 1 ? `全部下载完成 (${successCount} 个文件)` : "下载完成" }}
+          {{ queueTotal > 1 ? t('progress.completedAll', { count: successCount }) : t('progress.completedSingle') }}
         </el-tag>
 
         <el-tag
@@ -90,7 +92,7 @@ const emit = defineEmits(["clear-error", "retry-failed"]);
           class="status-tag"
         >
           <el-icon><Warning /></el-icon>
-          部分失败 (成功 {{ successCount }}，失败 {{ failedItems.length }})
+          {{ t('progress.partialFailed', { success: successCount, failed: failedItems.length }) }}
         </el-tag>
 
         <el-tag
@@ -101,7 +103,7 @@ const emit = defineEmits(["clear-error", "retry-failed"]);
           class="status-tag"
         >
           <el-icon><CircleClose /></el-icon>
-          {{ queueTotal > 1 ? `全部下载失败 (${failedItems.length} 个文件)` : "下载失败" }}
+          {{ queueTotal > 1 ? t('progress.failedAll', { count: failedItems.length }) : t('progress.failedSingle') }}
         </el-tag>
 
         <el-tag
@@ -112,18 +114,18 @@ const emit = defineEmits(["clear-error", "retry-failed"]);
           class="status-tag"
         >
           <el-icon><CircleClose /></el-icon>
-          下载已取消
+          {{ t('progress.cancelled') }}
         </el-tag>
       </div>
 
       <!-- 速度与剩余时间 (仅下载中或有数据时展示) -->
       <div v-if="isDownloading && (downloadSpeed || eta)" class="speed-eta-wrap">
         <span v-if="downloadSpeed" class="stat-pill">
-          <span class="stat-label">速度</span>
+          <span class="stat-label">{{ t('progress.speed') }}</span>
           <span class="stat-value">{{ downloadSpeed }}</span>
         </span>
         <span v-if="eta" class="stat-pill">
-          <span class="stat-label">剩余</span>
+          <span class="stat-label">{{ t('progress.eta') }}</span>
           <span class="stat-value">{{ eta }}</span>
         </span>
       </div>
@@ -161,7 +163,7 @@ const emit = defineEmits(["clear-error", "retry-failed"]);
         </template>
         <template #default>
           <div v-if="errorTips.length" class="error-tips-content">
-            <span class="tips-heading">排查建议：</span>
+            <span class="tips-heading">{{ t('progress.troubleshooting') }}</span>
             <ul>
               <li v-for="tip in errorTips" :key="tip">{{ tip }}</li>
             </ul>
@@ -175,7 +177,7 @@ const emit = defineEmits(["clear-error", "retry-failed"]);
       <div class="failed-summary-header">
         <div class="failed-title-group">
           <el-icon class="failed-icon"><Warning /></el-icon>
-          <span class="failed-heading">失败任务 ({{ failedItems.length }})</span>
+          <span class="failed-heading">{{ t('progress.failedTasks', { count: failedItems.length }) }}</span>
         </div>
         <el-button
           type="warning"
@@ -186,7 +188,7 @@ const emit = defineEmits(["clear-error", "retry-failed"]);
           @click="emit('retry-failed')"
         >
           <el-icon><Refresh /></el-icon>
-          重试失败项
+          {{ t('progress.retryFailed') }}
         </el-button>
       </div>
 

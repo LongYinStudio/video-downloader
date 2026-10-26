@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   Download,
   Search,
@@ -29,6 +30,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["update:url", "preview", "download", "cancel"]);
+const { t } = useI18n();
 
 const urlCount = computed(() => {
   return props.url
@@ -41,7 +43,7 @@ async function pasteClipboard() {
   try {
     const text = await navigator.clipboard.readText();
     if (!text || !text.trim()) {
-      ElMessage.warning("剪贴板中无内容");
+      ElMessage.warning(t("form.clipboardEmpty"));
       return;
     }
     const trimmed = text.trim();
@@ -49,9 +51,9 @@ async function pasteClipboard() {
       ? `${props.url.trim()}\n${trimmed}`
       : trimmed;
     emit("update:url", newUrl);
-    ElMessage.success("已粘贴剪贴板链接");
+    ElMessage.success(t("form.pasteSuccess"));
   } catch {
-    ElMessage.error("无法读取剪贴板，请手动粘贴");
+    ElMessage.error(t("form.pasteError"));
   }
 }
 
@@ -65,7 +67,7 @@ function clearUrl() {
     <div class="box-header">
       <div class="header-left">
         <el-icon class="header-icon"><VideoCamera /></el-icon>
-        <span class="header-title">视频链接</span>
+        <span class="header-title">{{ t("form.title") }}</span>
         <el-tag
           v-if="urlCount > 0"
           size="small"
@@ -74,7 +76,7 @@ function clearUrl() {
           round
           class="count-tag"
         >
-          已识别 {{ urlCount }} 个链接
+          {{ t("form.detectedLinks", { count: urlCount }, urlCount) }}
         </el-tag>
       </div>
 
@@ -87,7 +89,7 @@ function clearUrl() {
           @click="pasteClipboard"
         >
           <el-icon><DocumentCopy /></el-icon>
-          粘贴
+          {{ t("form.paste") }}
         </el-button>
         <el-button
           v-if="url.trim()"
@@ -98,7 +100,7 @@ function clearUrl() {
           @click="clearUrl"
         >
           <el-icon><Close /></el-icon>
-          清空
+          {{ t("form.clear") }}
         </el-button>
       </div>
     </div>
@@ -107,7 +109,7 @@ function clearUrl() {
       <el-input
         :model-value="url"
         type="textarea"
-        placeholder="支持 Bilibili、YouTube、TikTok、Twitter/X 等，多个链接请每行一个..."
+        :placeholder="t('form.placeholder')"
         :disabled="isDownloading"
         :autosize="{ minRows: 2, maxRows: 6 }"
         resize="none"
@@ -118,7 +120,7 @@ function clearUrl() {
 
     <div class="box-footer">
       <div class="footer-hint">
-        <span class="platform-hint">支持 1000+ 视频与音频站点</span>
+        <span class="platform-hint">{{ t("form.platformHint") }}</span>
       </div>
 
       <div class="action-buttons">
@@ -129,7 +131,7 @@ function clearUrl() {
           @click="emit('preview')"
         >
           <el-icon v-if="!isPreviewing"><Search /></el-icon>
-          <span>{{ isPreviewing ? "解析中..." : "解析信息" }}</span>
+          <span>{{ isPreviewing ? t("form.analyzing") : t("form.analyze") }}</span>
         </el-button>
 
         <el-button
@@ -140,7 +142,7 @@ function clearUrl() {
           @click="emit('download')"
         >
           <el-icon v-if="!isDownloading"><Download /></el-icon>
-          <span>{{ isDownloading ? "下载中..." : "开始下载" }}</span>
+          <span>{{ isDownloading ? t("form.downloading") : t("form.startDownload") }}</span>
         </el-button>
 
         <el-button
@@ -151,7 +153,7 @@ function clearUrl() {
           :loading="isCancelling"
           @click="emit('cancel')"
         >
-          取消
+          {{ t("form.cancel") }}
         </el-button>
       </div>
     </div>

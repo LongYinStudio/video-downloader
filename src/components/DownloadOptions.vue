@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   ArrowDown,
   Folder,
@@ -11,9 +12,9 @@ import {
 } from "@element-plus/icons-vue";
 import {
   COOKIES_BROWSER_OPTIONS,
-  COOKIES_MODE_OPTIONS,
-  FILENAME_TEMPLATE_OPTIONS,
-  FORMAT_OPTIONS,
+  getCookiesModeOptions,
+  getFilenameTemplateOptions,
+  getFormatOptions,
 } from "../settings.js";
 
 defineProps({
@@ -74,7 +75,12 @@ const emit = defineEmits([
   "clear-cookies",
 ]);
 
+const { t } = useI18n();
 const isExpanded = ref(false);
+
+const formatOptions = computed(() => getFormatOptions(t));
+const filenameTemplateOptions = computed(() => getFilenameTemplateOptions(t));
+const cookiesModeOptions = computed(() => getCookiesModeOptions(t));
 </script>
 
 <template>
@@ -83,7 +89,7 @@ const isExpanded = ref(false);
     <div class="quick-options-bar">
       <!-- 格式预设 -->
       <div class="quick-option-item format-item">
-        <span class="option-label">格式</span>
+        <span class="option-label">{{ t("options.formatLabel") }}</span>
         <el-select
           :model-value="formatPreset"
           :disabled="isDownloading"
@@ -92,7 +98,7 @@ const isExpanded = ref(false);
           @update:model-value="emit('update:formatPreset', $event)"
         >
           <el-option
-            v-for="item in FORMAT_OPTIONS"
+            v-for="item in formatOptions"
             :key="item.value"
             :label="item.label"
             :value="item.value"
@@ -102,12 +108,12 @@ const isExpanded = ref(false);
 
       <!-- 保存目录 -->
       <div class="quick-option-item dir-item">
-        <span class="option-label">目录</span>
-        <div class="dir-pill" :title="dir || '默认: 系统 Downloads 目录'" @click="emit('choose-dir')">
+        <span class="option-label">{{ t("options.dirLabel") }}</span>
+        <div class="dir-pill" :title="dir || t('options.dirPlaceholder')" @click="emit('choose-dir')">
           <el-icon class="dir-icon"><Folder /></el-icon>
-          <span class="dir-text">{{ dir ? dir.split(/[/\\]/).pop() || dir : "系统下载目录" }}</span>
+          <span class="dir-text">{{ dir ? dir.split(/[/\\]/).pop() || dir : t("options.sysDownloads") }}</span>
           <el-button size="small" text class="dir-change-btn" :disabled="isDownloading">
-            更改
+            {{ t("options.changeDir") }}
           </el-button>
         </div>
       </div>
@@ -121,7 +127,7 @@ const isExpanded = ref(false);
           @click="isExpanded = !isExpanded"
         >
           <el-icon class="toggle-icon"><Operation /></el-icon>
-          <span>高级参数</span>
+          <span>{{ t("options.advancedBtn") }}</span>
           <el-icon class="arrow-icon" :class="{ 'is-rotated': isExpanded }">
             <ArrowDown />
           </el-icon>
@@ -136,8 +142,8 @@ const isExpanded = ref(false);
           <!-- Cookies 来源 -->
           <div class="setting-cell">
             <div class="cell-header">
-              <span class="cell-label">Cookies 登录态</span>
-              <el-tooltip content="下载会员、私密或限权内容时使用" placement="top">
+              <span class="cell-label">{{ t("options.cookiesLabel") }}</span>
+              <el-tooltip :content="t('options.cookiesTooltip')" placement="top">
                 <el-icon class="help-icon"><QuestionFilled /></el-icon>
               </el-tooltip>
             </div>
@@ -149,7 +155,7 @@ const isExpanded = ref(false);
               @update:model-value="emit('update:cookiesMode', $event)"
             >
               <el-option
-                v-for="item in COOKIES_MODE_OPTIONS"
+                v-for="item in cookiesModeOptions"
                 :key="item.value"
                 :label="item.label"
                 :value="item.value"
@@ -163,7 +169,7 @@ const isExpanded = ref(false);
                 :disabled="isDownloading"
                 size="default"
                 class="cell-control"
-                placeholder="选择浏览器"
+                :placeholder="t('options.selectBrowser')"
                 @update:model-value="emit('update:cookiesBrowser', $event)"
               >
                 <el-option
@@ -173,7 +179,7 @@ const isExpanded = ref(false);
                   :value="item.value"
                 />
               </el-select>
-              <span class="sub-hint">支持 Chrome、Edge、Firefox 等</span>
+              <span class="sub-hint">{{ t("options.browserHint") }}</span>
             </div>
 
             <!-- 文件选择 -->
@@ -181,14 +187,14 @@ const isExpanded = ref(false);
               <div class="file-picker-row">
                 <el-input
                   :model-value="cookiesPath"
-                  placeholder="未选择 cookies.txt"
+                  :placeholder="t('options.noCookiesFile')"
                   readonly
                   size="default"
                   class="file-input"
                   :disabled="isDownloading"
                 />
                 <el-button size="default" :disabled="isDownloading" @click="emit('choose-cookies')">
-                  选择
+                  {{ t("options.selectFile") }}
                 </el-button>
                 <el-button
                   v-if="cookiesPath"
@@ -207,8 +213,8 @@ const isExpanded = ref(false);
           <!-- 文件名模板 -->
           <div class="setting-cell">
             <div class="cell-header">
-              <span class="cell-label">文件名模板</span>
-              <el-tooltip content="控制保存文件的命名格式" placement="top">
+              <span class="cell-label">{{ t("options.filenameLabel") }}</span>
+              <el-tooltip :content="t('options.filenameTooltip')" placement="top">
                 <el-icon class="help-icon"><QuestionFilled /></el-icon>
               </el-tooltip>
             </div>
@@ -220,7 +226,7 @@ const isExpanded = ref(false);
               @update:model-value="emit('update:filenameTemplate', $event)"
             >
               <el-option
-                v-for="item in FILENAME_TEMPLATE_OPTIONS"
+                v-for="item in filenameTemplateOptions"
                 :key="item.value"
                 :label="item.label"
                 :value="item.value"
@@ -231,11 +237,11 @@ const isExpanded = ref(false);
           <!-- 下载参数 (并发与重试) -->
           <div class="setting-cell">
             <div class="cell-header">
-              <span class="cell-label">性能与重试</span>
+              <span class="cell-label">{{ t("options.perfAndRetries") }}</span>
             </div>
             <div class="numeric-row">
               <div class="num-item">
-                <span class="num-label">重试次数</span>
+                <span class="num-label">{{ t("options.retries") }}</span>
                 <el-input-number
                   :model-value="retries"
                   :min="0"
@@ -248,7 +254,7 @@ const isExpanded = ref(false);
                 />
               </div>
               <div class="num-item">
-                <span class="num-label">并发片段</span>
+                <span class="num-label">{{ t("options.fragments") }}</span>
                 <el-input-number
                   :model-value="concurrentFragments"
                   :min="1"
@@ -266,14 +272,14 @@ const isExpanded = ref(false);
           <!-- 代理设置 -->
           <div class="setting-cell">
             <div class="cell-header">
-              <span class="cell-label">网络代理</span>
-              <el-tooltip content="支持 HTTP / SOCKS5 代理" placement="top">
+              <span class="cell-label">{{ t("options.proxyLabel") }}</span>
+              <el-tooltip :content="t('options.proxyTooltip')" placement="top">
                 <el-icon class="help-icon"><QuestionFilled /></el-icon>
               </el-tooltip>
             </div>
             <el-input
               :model-value="proxy"
-              placeholder="可选: http://127.0.0.1:7890"
+              :placeholder="t('options.proxyPlaceholder')"
               :disabled="isDownloading"
               size="default"
               class="cell-control"

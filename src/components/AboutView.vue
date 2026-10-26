@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { useI18n } from "vue-i18n";
 import { version } from "../utils.js";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -14,6 +15,7 @@ import {
 } from "@element-plus/icons-vue";
 import { STORAGE_KEYS } from "../settings.js";
 
+const { t } = useI18n();
 const isChecking = ref(false);
 const updateDialogVisible = ref(false);
 const latestRelease = ref({
@@ -48,7 +50,7 @@ async function checkUpdate() {
     latestRelease.value = {
       tagName: latestTag,
       name: data.name || latestTag,
-      body: data.body || "暂无版本更新说明",
+      body: data.body || t("about.noReleaseNotes"),
       htmlUrl:
         data.htmlUrl ||
         "https://github.com/LongYinStudio/video-downloader/releases/latest",
@@ -57,15 +59,15 @@ async function checkUpdate() {
     if (compareVersions(latestTag, version) > 0) {
       updateDialogVisible.value = true;
     } else {
-      ElMessage.success(`当前已是最新版本 (${version})`);
+      ElMessage.success(t("about.alreadyLatest", { version }));
     }
   } catch (err) {
     ElMessageBox.confirm(
-      `检查更新未成功（${err?.message || err || "网络连接异常"}），是否前往 GitHub Releases 页面查看？`,
-      "提示",
+      t("about.updateCheckFailed", { error: err?.message || err || "Network error" }),
+      t("about.notice"),
       {
-        confirmButtonText: "前往查看",
-        cancelButtonText: "取消",
+        confirmButtonText: t("about.goToView"),
+        cancelButtonText: t("common.cancel"),
         type: "info",
       },
     )
@@ -103,8 +105,8 @@ function openGithub() {
       <!-- 页面顶部标题栏 -->
       <header class="page-topbar">
         <div class="topbar-title-group">
-          <h2 class="page-title">关于软件</h2>
-          <span class="page-subtitle">版本信息、架构说明与开源社区维护</span>
+          <h2 class="page-title">{{ t("about.title") }}</h2>
+          <span class="page-subtitle">{{ t("about.subtitle") }}</span>
         </div>
       </header>
 
@@ -117,13 +119,13 @@ function openGithub() {
             </div>
             <div class="identity-details">
               <div class="name-version-row">
-                <h3 class="app-display-name">视频下载器</h3>
+                <h3 class="app-display-name">{{ t("about.appName") }}</h3>
                 <el-tag size="small" type="primary" effect="light" round class="version-tag">
                   {{ version }}
                 </el-tag>
               </div>
               <p class="app-tagline">
-                跨平台桌面端音视频批量下载工具，基于 Tauri 2.0 与 yt-dlp 构建。
+                {{ t("about.appTagline") }}
               </p>
             </div>
           </div>
@@ -137,7 +139,7 @@ function openGithub() {
               @click="checkUpdate"
             >
               <el-icon><Refresh /></el-icon>
-              检查更新
+              {{ t("about.checkUpdate") }}
             </el-button>
             <el-button
               size="default"
@@ -146,7 +148,7 @@ function openGithub() {
               @click="feedback"
             >
               <el-icon><ChatLineRound /></el-icon>
-              反馈建议
+              {{ t("about.feedback") }}
             </el-button>
           </div>
         </section>
@@ -154,25 +156,25 @@ function openGithub() {
         <!-- 开源与技术栈卡片 -->
         <section class="tech-card">
           <div class="card-header">
-            <h4 class="card-title">技术架构与协议</h4>
-            <span class="card-desc">本项目完全开源且尊重开源许可</span>
+            <h4 class="card-title">{{ t("about.archTitle") }}</h4>
+            <span class="card-desc">{{ t("about.archDesc") }}</span>
           </div>
 
           <div class="tech-chips-grid">
             <div class="tech-chip">
-              <span class="chip-name">核心框架</span>
+              <span class="chip-name">{{ t("about.coreFramework") }}</span>
               <span class="chip-val">Tauri 2.0 + Rust</span>
             </div>
             <div class="tech-chip">
-              <span class="chip-name">前端视图</span>
+              <span class="chip-name">{{ t("about.frontendView") }}</span>
               <span class="chip-val">Vue 3 + Vite</span>
             </div>
             <div class="tech-chip">
-              <span class="chip-name">下载内核</span>
+              <span class="chip-name">{{ t("about.downloadEngine") }}</span>
               <span class="chip-val">yt-dlp</span>
             </div>
             <div class="tech-chip">
-              <span class="chip-name">媒体转码</span>
+              <span class="chip-name">{{ t("about.mediaTranscoding") }}</span>
               <span class="chip-val">FFmpeg</span>
             </div>
           </div>
@@ -181,13 +183,13 @@ function openGithub() {
             <div class="repo-info">
               <el-icon class="repo-icon"><Promotion /></el-icon>
               <div class="repo-texts">
-                <span class="repo-title">开源代码仓库</span>
+                <span class="repo-title">{{ t("about.repoTitle") }}</span>
                 <span class="repo-url">github.com/LongYinStudio/video-downloader</span>
               </div>
             </div>
             <el-button size="small" type="primary" plain class="repo-btn" @click="openGithub">
               <el-icon><Link /></el-icon>
-              访问仓库
+              {{ t("about.visitRepo") }}
             </el-button>
           </div>
         </section>
@@ -202,16 +204,16 @@ function openGithub() {
     <!-- 更新弹窗 -->
     <el-dialog
       v-model="updateDialogVisible"
-      title="发现新版本"
+      :title="t('about.updateDialogTitle')"
       width="min(90%, 500px)"
       align-center
       class="modern-dialog"
     >
       <div class="update-dialog-content">
         <div class="version-badge-row">
-          <el-tag type="info" round size="default">当前: {{ version }}</el-tag>
+          <el-tag type="info" round size="default">{{ t("about.currentVersion", { version }) }}</el-tag>
           <span class="arrow-icon">→</span>
-          <el-tag type="success" effect="dark" round size="default">最新: {{ latestRelease.tagName }}</el-tag>
+          <el-tag type="success" effect="dark" round size="default">{{ t("about.latestVersion", { version: latestRelease.tagName }) }}</el-tag>
         </div>
         <div class="release-notes-box">
           <div class="release-title">{{ latestRelease.name }}</div>
@@ -220,10 +222,10 @@ function openGithub() {
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="updateDialogVisible = false">稍后再说</el-button>
+          <el-button @click="updateDialogVisible = false">{{ t("about.later") }}</el-button>
           <el-button type="primary" @click="goToDownload">
             <el-icon><Download /></el-icon>
-            前往下载更新
+            {{ t("about.downloadUpdate") }}
           </el-button>
         </div>
       </template>

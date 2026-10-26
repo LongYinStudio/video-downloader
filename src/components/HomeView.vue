@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { downloadDir } from "@tauri-apps/api/path";
@@ -24,6 +25,7 @@ import DownloadOptions from "./DownloadOptions.vue";
 import DownloadProgress from "./DownloadProgress.vue";
 import PreviewPanel from "./PreviewPanel.vue";
 
+const { t } = useI18n();
 const url = ref("");
 const progress = ref("");
 const error = ref("");
@@ -61,8 +63,12 @@ function getDownloadError(message) {
   const normalized = message.toLowerCase();
   if (normalized.includes("ffmpeg")) {
     return {
-      message: "FFmpeg 不可用，无法完成合并或音频转换",
-      tips: ["安装 FFmpeg", "确认 ffmpeg 已加入系统 PATH", "如不需要转换，可改用普通视频格式"],
+      message: t("errors.ffmpegMsg"),
+      tips: [
+        t("errors.ffmpegTip1"),
+        t("errors.ffmpegTip2"),
+        t("errors.ffmpegTip3"),
+      ],
     };
   }
   if (
@@ -71,8 +77,12 @@ function getDownloadError(message) {
     normalized.includes("failed to establish")
   ) {
     return {
-      message: "网络或代理连接失败",
-      tips: ["检查网络连接", "确认代理地址和端口可用", "不需要代理时清空代理设置"],
+      message: t("errors.networkMsg"),
+      tips: [
+        t("errors.networkTip1"),
+        t("errors.networkTip2"),
+        t("errors.networkTip3"),
+      ],
     };
   }
   if (
@@ -82,21 +92,21 @@ function getDownloadError(message) {
     normalized.includes("forbidden")
   ) {
     return {
-      message: "视频需要登录或没有访问权限",
+      message: t("errors.loginMsg"),
       tips: [
-        "确认链接可在浏览器中打开",
-        "检查视频是否为私密或会员内容",
-        "在设置或首页参数中配置 Cookies 来源",
+        t("errors.loginTip1"),
+        t("errors.loginTip2"),
+        t("errors.loginTip3"),
       ],
     };
   }
   if (normalized.includes("cookie")) {
     return {
-      message: "Cookies 不可用或读取失败",
+      message: t("errors.cookieMsg"),
       tips: [
-        "确认 cookies.txt 为 Netscape 格式，或改用浏览器读取",
-        "如使用浏览器读取，先关闭对应浏览器再重试",
-        "确认目标浏览器已登录对应站点",
+        t("errors.cookieTip1"),
+        t("errors.cookieTip2"),
+        t("errors.cookieTip3"),
       ],
     };
   }
@@ -105,8 +115,12 @@ function getDownloadError(message) {
     normalized.includes("format is not available")
   ) {
     return {
-      message: "当前下载格式在该视频上不可用",
-      tips: ["切换为最佳画质", "尝试降低分辨率限制", "如果只需音频，可改为仅音频 MP3"],
+      message: t("errors.formatMsg"),
+      tips: [
+        t("errors.formatTip1"),
+        t("errors.formatTip2"),
+        t("errors.formatTip3"),
+      ],
     };
   }
   if (
@@ -115,18 +129,27 @@ function getDownloadError(message) {
     normalized.includes("no video formats found")
   ) {
     return {
-      message: "视频链接无效或当前站点不受支持",
-      tips: ["确认 URL 以 http:// 或 https:// 开头", "检查链接是否完整", "尝试在浏览器中打开该链接"],
+      message: t("errors.invalidUrlMsg"),
+      tips: [
+        t("errors.invalidUrlTip1"),
+        t("errors.invalidUrlTip2"),
+        t("errors.invalidUrlTip3"),
+      ],
     };
   }
 
   return {
     message,
-    tips: ["URL 是否正确", "网络连接是否正常", "视频链接是否有效", "代理设置是否正确"],
+    tips: [
+      t("errors.fallbackTip1"),
+      t("errors.fallbackTip2"),
+      t("errors.fallbackTip3"),
+      t("errors.fallbackTip4"),
+    ],
   };
 }
 
-function setActionError(rawMessage, prefix = "下载失败") {
+function setActionError(rawMessage, prefix = t("common.downloadFailed")) {
   const formatted = getDownloadError(rawMessage);
   error.value = `${prefix}：${formatted.message}`;
   errorTips.value = formatted.tips;
@@ -183,7 +206,7 @@ async function chooseDir() {
   const selected = await open({
     directory: true,
     multiple: false,
-    title: "选择目录",
+    title: t("home.dialogSelectDir"),
   });
 
   if (selected) {
@@ -194,7 +217,7 @@ async function chooseDir() {
 async function chooseCookiesFile() {
   const selected = await open({
     multiple: false,
-    title: "选择 Cookies 文件",
+    title: t("home.dialogSelectCookies"),
   });
 
   if (typeof selected === "string") {
@@ -209,13 +232,13 @@ function clearCookiesFile() {
 async function previewInfo() {
   const urls = getUrls();
   if (!urls.length) {
-    error.value = "请输入视频链接";
+    error.value = t("home.inputPrompt");
     return;
   }
 
   const invalidUrl = urls.find((item) => !URL_PATTERN.test(item));
   if (invalidUrl) {
-    error.value = `请输入有效的 URL：${invalidUrl}`;
+    error.value = t("home.invalidUrlPrompt", { url: invalidUrl });
     return;
   }
 
@@ -238,7 +261,7 @@ async function previewInfo() {
     previewItems.value = Array.isArray(items) ? items : [];
   } catch (err) {
     clearPreview();
-    setActionError(getErrorMessage(err), "预览失败");
+    setActionError(getErrorMessage(err), t("common.previewFailed"));
   } finally {
     isPreviewing.value = false;
   }
@@ -247,14 +270,14 @@ async function previewInfo() {
 async function download(customUrls = null) {
   const urls = Array.isArray(customUrls) ? customUrls : getUrls();
   if (!urls.length) {
-    error.value = "请输入视频链接";
+    error.value = t("home.inputPrompt");
     downloadStatus.value = "failed";
     return;
   }
 
   const invalidUrl = urls.find((item) => !URL_PATTERN.test(item));
   if (invalidUrl) {
-    error.value = `请输入有效的 URL：${invalidUrl}`;
+    error.value = t("home.invalidUrlPrompt", { url: invalidUrl });
     downloadStatus.value = "failed";
     return;
   }
@@ -343,13 +366,18 @@ async function download(customUrls = null) {
     downloadStatus.value = "completed";
   } else if (successCount.value > 0) {
     downloadStatus.value = "partial_failed";
-    error.value = `批量任务完成：${successCount.value} 个成功，${failedItems.value.length} 个失败`;
-    errorTips.value = ["可展开下方失败列表查看原因或点击一键重试"];
+    error.value = t("home.batchSuccess", {
+      success: successCount.value,
+      failed: failedItems.value.length,
+    });
+    errorTips.value = [t("home.batchSuccessTip")];
   } else {
     downloadStatus.value = "failed";
     if (failedItems.value.length > 1) {
-      error.value = `批量下载失败：共 ${failedItems.value.length} 个任务均未下载成功`;
-      errorTips.value = ["请检查网络连接及代理设置", "检查是否需要配置登录态 Cookies", "可点击下方重试失败项"];
+      error.value = t("home.batchFailedAll", {
+        count: failedItems.value.length,
+      });
+      errorTips.value = t("home.batchFailedTips");
     }
   }
 
@@ -374,7 +402,7 @@ async function download(customUrls = null) {
         }
       } catch (openErr) {
         console.warn("自动打开目录失败:", openErr);
-        ElMessage.warning(`自动打开目录失败: ${getErrorMessage(openErr)}`);
+        ElMessage.warning(t("home.autoOpenFailed", { error: getErrorMessage(openErr) }));
       }
     }
   }
@@ -565,8 +593,8 @@ onUnmounted(() => {
       <!-- 页面顶部简要标题栏 -->
       <header class="page-topbar">
         <div class="topbar-title-group">
-          <h2 class="page-title">下载中心</h2>
-          <span class="page-subtitle">支持主流音视频平台多线程解析与批量提取</span>
+          <h2 class="page-title">{{ t("home.title") }}</h2>
+          <span class="page-subtitle">{{ t("home.subtitle") }}</span>
         </div>
         <el-tag size="small" type="primary" effect="plain" round class="version-tag">
           {{ version }}

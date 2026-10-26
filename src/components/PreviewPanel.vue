@@ -1,6 +1,7 @@
 <script setup>
 import { Link, Picture, VideoCamera, CollectionTag, Clock, VideoPlay } from "@element-plus/icons-vue";
 import { reactive, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 const props = defineProps({
   isPreviewing: {
@@ -13,6 +14,7 @@ const props = defineProps({
   },
 });
 
+const { t } = useI18n();
 const brokenImages = reactive({});
 
 watch(
@@ -41,7 +43,7 @@ function getPreviewType(item) {
 }
 
 function getPreviewLabel(item) {
-  return item.isPlaylist ? "播放列表" : "单个视频";
+  return item.isPlaylist ? t("preview.playlist") : t("preview.singleVideo");
 }
 </script>
 
@@ -49,14 +51,14 @@ function getPreviewLabel(item) {
   <section v-if="isPreviewing || previewItems.length" class="preview-section">
     <div class="preview-header">
       <div class="header-info">
-        <h4 class="preview-title">解析结果</h4>
-        <span class="preview-desc">下载前确认媒体元数据与条目</span>
+        <h4 class="preview-title">{{ t("preview.title") }}</h4>
+        <span class="preview-desc">{{ t("preview.desc") }}</span>
       </div>
       <el-tag v-if="isPreviewing" type="primary" size="small" effect="plain" round>
-        解析中...
+        {{ t("preview.parsing") }}
       </el-tag>
       <el-tag v-else type="success" size="small" effect="light" round>
-        {{ previewItems.length }} 个链接已就绪
+        {{ t("preview.readyCount", { count: previewItems.length }) }}
       </el-tag>
     </div>
 
@@ -81,7 +83,7 @@ function getPreviewLabel(item) {
           />
           <div v-else class="media-placeholder">
             <el-icon><Picture /></el-icon>
-            <span>暂无封面</span>
+            <span>{{ t("preview.noThumbnail") }}</span>
           </div>
 
           <div v-if="item.duration" class="duration-badge">
@@ -100,12 +102,12 @@ function getPreviewLabel(item) {
               {{ item.extractor }}
             </el-tag>
             <el-tag v-if="item.entryCount" size="small" type="info" effect="plain" round>
-              {{ item.entryCount }} 集
+              {{ t("preview.episodesCount", { count: item.entryCount }) }}
             </el-tag>
           </div>
 
           <h5 class="media-title" :title="item.title">
-            {{ item.title || "未获取到标题" }}
+            {{ item.title || t("preview.noTitle") }}
           </h5>
 
           <div class="media-author-row">
@@ -129,7 +131,7 @@ function getPreviewLabel(item) {
           <div v-if="item.entries && item.entries.length" class="playlist-preview">
             <div class="playlist-header">
               <el-icon><CollectionTag /></el-icon>
-              <span>分集列表预览 (前 {{ item.entries.length }} 集)</span>
+              <span>{{ t("preview.playlistPreview", { count: item.entries.length }) }}</span>
             </div>
             <ul class="playlist-list">
               <li
@@ -138,7 +140,7 @@ function getPreviewLabel(item) {
                 class="playlist-item"
               >
                 <span class="entry-num">{{ entryIndex + 1 }}</span>
-                <span class="entry-name" :title="entry.title">{{ entry.title || "未命名" }}</span>
+                <span class="entry-name" :title="entry.title">{{ entry.title || t("preview.untitled") }}</span>
                 <span v-if="entry.duration" class="entry-time">{{ entry.duration }}</span>
               </li>
             </ul>

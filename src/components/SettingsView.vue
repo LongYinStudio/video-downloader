@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { useI18n } from "vue-i18n";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -19,11 +20,18 @@ import {
   DEFAULT_DOWNLOAD_OPTIONS,
   FILENAME_TEMPLATE_OPTIONS,
   FORMAT_OPTIONS,
+  LANGUAGE_OPTIONS,
   STORAGE_KEYS,
+  getCookiesModeOptions,
+  getFilenameTemplateOptions,
+  getFormatOptions,
   readNumberSetting,
   readOptionSetting,
 } from "../settings.js";
+import { getDefaultLanguage, setAppLanguage } from "../i18n/index.js";
 
+const { t, locale } = useI18n();
+const currentLanguage = ref(locale.value);
 const themeMode = ref("system");
 const defaultDir = ref("");
 const defaultProxy = ref("");
@@ -37,6 +45,10 @@ const defaultConcurrentFragments = ref(DEFAULT_DOWNLOAD_OPTIONS.concurrentFragme
 const autoOpenDir = ref(true);
 const autoPasteClipboard = ref(false);
 
+const formatOptions = computed(() => getFormatOptions(t));
+const filenameTemplateOptions = computed(() => getFilenameTemplateOptions(t));
+const cookiesModeOptions = computed(() => getCookiesModeOptions(t));
+
 const isCheckingEnv = ref(false);
 const envInfo = ref({
   ffmpegAvailable: false,
@@ -44,6 +56,11 @@ const envInfo = ref({
   ytdlpAvailable: false,
   ytdlpVersion: "",
 });
+
+function changeLanguage(lang) {
+  currentLanguage.value = lang;
+  setAppLanguage(lang);
+}
 
 async function detectEnvironment() {
   isCheckingEnv.value = true;
@@ -67,6 +84,7 @@ function applyTheme(mode) {
 }
 
 onMounted(() => {
+  currentLanguage.value = locale.value;
   themeMode.value = localStorage.getItem(STORAGE_KEYS.theme) || "system";
   defaultDir.value = localStorage.getItem(STORAGE_KEYS.dir) || "";
   defaultProxy.value = localStorage.getItem(STORAGE_KEYS.proxy) || "";
@@ -188,7 +206,7 @@ async function chooseDir() {
   const selected = await open({
     directory: true,
     multiple: false,
-    title: "选择目录",
+    title: t("settings.defaultDir"),
   });
 
   if (selected) {
@@ -199,7 +217,7 @@ async function chooseDir() {
 async function chooseCookiesFile() {
   const selected = await open({
     multiple: false,
-    title: "选择 Cookies 文件",
+    title: t("options.selectFile"),
   });
 
   if (typeof selected === "string") {
@@ -250,17 +268,36 @@ function resetAll() {
       <!-- 页面顶部标题栏 -->
       <header class="page-topbar">
         <div class="topbar-title-group">
-          <h2 class="page-title">参数设置</h2>
-          <span class="page-subtitle">定制应用外观、下载规则与内核运行环境</span>
+          <h2 class="page-title">{{ t("settings.title") }}</h2>
+          <span class="page-subtitle">{{ t("settings.subtitle") }}</span>
         </div>
       </header>
 
       <div class="settings-stack">
-        <!-- 1. 外观主题卡片 -->
+        <!-- 1. 界面语言卡片 -->
         <section class="config-card">
           <div class="card-header">
-            <h3 class="card-title">界面外观</h3>
-            <span class="card-desc">选择符合使用习惯的主题模式</span>
+            <h3 class="card-title">{{ t("settings.language") }}</h3>
+            <span class="card-desc">{{ t("settings.languageDesc") }}</span>
+          </div>
+          <div class="theme-options">
+            <div
+              v-for="lang in LANGUAGE_OPTIONS"
+              :key="lang.value"
+              class="theme-chip"
+              :class="{ 'is-selected': currentLanguage === lang.value }"
+              @click="changeLanguage(lang.value)"
+            >
+              <span>{{ lang.label }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. 外观主题卡片 -->
+        <section class="config-card">
+          <div class="card-header">
+            <h3 class="card-title">{{ t("settings.appearance") }}</h3>
+            <span class="card-desc">{{ t("settings.appearanceDesc") }}</span>
           </div>
           <div class="theme-options">
             <div
@@ -269,7 +306,7 @@ function resetAll() {
               @click="themeMode = 'system'"
             >
               <el-icon><Monitor /></el-icon>
-              <span>跟随系统</span>
+              <span>{{ t("settings.themeSystem") }}</span>
             </div>
             <div
               class="theme-chip"
@@ -277,7 +314,7 @@ function resetAll() {
               @click="themeMode = 'light'"
             >
               <el-icon><Sunny /></el-icon>
-              <span>浅色模式</span>
+              <span>{{ t("settings.themeLight") }}</span>
             </div>
             <div
               class="theme-chip"
@@ -285,17 +322,17 @@ function resetAll() {
               @click="themeMode = 'dark'"
             >
               <el-icon><Moon /></el-icon>
-              <span>深色模式</span>
+              <span>{{ t("settings.themeDark") }}</span>
             </div>
           </div>
         </section>
 
-        <!-- 2. 环境健康诊断 -->
+        <!-- 3. 环境健康诊断 -->
         <section class="config-card">
           <div class="card-header-with-action">
             <div>
-              <h3 class="card-title">环境健康诊断</h3>
-              <span class="card-desc">检测音视频转换与解析内核状态</span>
+              <h3 class="card-title">{{ t("settings.envTitle") }}</h3>
+              <span class="card-desc">{{ t("settings.envDesc") }}</span>
             </div>
             <el-button
               size="small"
@@ -305,27 +342,27 @@ function resetAll() {
               @click="detectEnvironment"
             >
               <el-icon><Refresh /></el-icon>
-              重新检测
+              {{ t("settings.recheck") }}
             </el-button>
           </div>
 
           <div class="env-cards-row">
             <div class="env-status-box">
               <div class="env-top">
-                <span class="env-label">FFmpeg 转换器</span>
+                <span class="env-label">{{ t("settings.ffmpegTitle") }}</span>
                 <el-tag
                   :type="envInfo.ffmpegAvailable ? 'success' : 'danger'"
                   size="small"
                   effect="light"
                   round
                 >
-                  {{ envInfo.ffmpegAvailable ? '已检测到' : '未检测到' }}
+                  {{ envInfo.ffmpegAvailable ? t("settings.detected") : t("settings.notDetected") }}
                 </el-tag>
               </div>
               <div class="env-info-text">
-                <span v-if="envInfo.ffmpegAvailable">版本: {{ envInfo.ffmpegVersion }}</span>
+                <span v-if="envInfo.ffmpegAvailable">{{ t("settings.version", { version: envInfo.ffmpegVersion }) }}</span>
                 <span v-else class="env-warn-text">
-                  系统 PATH 未找到 ffmpeg，音视频合并与 MP3 转换可能受限。
+                  {{ t("settings.ffmpegWarning") }}
                 </span>
               </div>
               <el-button
@@ -336,47 +373,47 @@ function resetAll() {
                 class="install-link"
                 @click="openUrl('https://ffmpeg.org/download.html')"
               >
-                前往安装 FFmpeg →
+                {{ t("settings.installFfmpeg") }}
               </el-button>
             </div>
 
             <div class="env-status-box">
               <div class="env-top">
-                <span class="env-label">yt-dlp 解析内核</span>
+                <span class="env-label">{{ t("settings.ytdlpTitle") }}</span>
                 <el-tag
                   :type="envInfo.ytdlpAvailable ? 'success' : 'danger'"
                   size="small"
                   effect="light"
                   round
                 >
-                  {{ envInfo.ytdlpAvailable ? '就绪' : '异常' }}
+                  {{ envInfo.ytdlpAvailable ? t("settings.ytdlpReady") : t("settings.ytdlpAbnormal") }}
                 </el-tag>
               </div>
               <div class="env-info-text">
-                <span>版本: {{ envInfo.ytdlpVersion || "检测中..." }}</span>
+                <span>{{ t("settings.version", { version: envInfo.ytdlpVersion || t("settings.checking") }) }}</span>
               </div>
             </div>
           </div>
         </section>
 
-        <!-- 3. 下载默认规则 -->
+        <!-- 4. 下载默认规则 -->
         <section class="config-card">
           <div class="card-header">
-            <h3 class="card-title">下载默认值</h3>
-            <span class="card-desc">配置启动应用时的默认参数预设</span>
+            <h3 class="card-title">{{ t("settings.defaultsTitle") }}</h3>
+            <span class="card-desc">{{ t("settings.defaultsDesc") }}</span>
           </div>
 
           <div class="fields-list">
             <!-- 默认保存目录 -->
             <div class="form-row">
               <div class="row-info">
-                <span class="row-label">默认保存目录</span>
-                <span class="row-desc">未指定时默认使用系统 Downloads 目录</span>
+                <span class="row-label">{{ t("settings.defaultDir") }}</span>
+                <span class="row-desc">{{ t("settings.defaultDirDesc") }}</span>
               </div>
               <div class="row-control-wide">
                 <el-input
                   v-model="defaultDir"
-                  placeholder="系统 Downloads 目录"
+                  :placeholder="t('settings.defaultDirPlaceholder')"
                   readonly
                   size="default"
                 >
@@ -384,9 +421,9 @@ function resetAll() {
                     <el-icon><Folder /></el-icon>
                   </template>
                 </el-input>
-                <el-button size="default" @click="chooseDir">选择</el-button>
+                <el-button size="default" @click="chooseDir">{{ t("common.select") }}</el-button>
                 <el-button v-if="defaultDir" size="default" text class="clear-btn" @click="clearDir">
-                  清除
+                  {{ t("common.clear") }}
                 </el-button>
               </div>
             </div>
@@ -394,10 +431,10 @@ function resetAll() {
             <!-- 默认格式与命名模板 -->
             <div class="form-grid-two">
               <div class="form-col">
-                <span class="row-label">默认下载格式</span>
+                <span class="row-label">{{ t("settings.defaultFormat") }}</span>
                 <el-select v-model="defaultFormat" size="default" class="full-width">
                   <el-option
-                    v-for="item in FORMAT_OPTIONS"
+                    v-for="item in formatOptions"
                     :key="item.value"
                     :label="item.label"
                     :value="item.value"
@@ -405,10 +442,10 @@ function resetAll() {
                 </el-select>
               </div>
               <div class="form-col">
-                <span class="row-label">默认文件名模板</span>
+                <span class="row-label">{{ t("settings.defaultFilename") }}</span>
                 <el-select v-model="defaultFilenameTemplate" size="default" class="full-width">
                   <el-option
-                    v-for="item in FILENAME_TEMPLATE_OPTIONS"
+                    v-for="item in filenameTemplateOptions"
                     :key="item.value"
                     :label="item.label"
                     :value="item.value"
@@ -420,13 +457,13 @@ function resetAll() {
             <!-- Cookies 默认来源 -->
             <div class="form-row">
               <div class="row-info">
-                <span class="row-label">Cookies 登录态来源</span>
-                <span class="row-desc">用于会员或限制访问内容的认证</span>
+                <span class="row-label">{{ t("settings.cookiesSource") }}</span>
+                <span class="row-desc">{{ t("settings.cookiesSourceDesc") }}</span>
               </div>
               <div class="row-control-stack">
                 <el-select v-model="defaultCookiesMode" size="default" class="full-width">
                   <el-option
-                    v-for="item in COOKIES_MODE_OPTIONS"
+                    v-for="item in cookiesModeOptions"
                     :key="item.value"
                     :label="item.label"
                     :value="item.value"
@@ -438,7 +475,7 @@ function resetAll() {
                     v-model="defaultCookiesBrowser"
                     size="default"
                     class="full-width"
-                    placeholder="选择目标浏览器"
+                    :placeholder="t('settings.selectBrowserPlaceholder')"
                   >
                     <el-option
                       v-for="item in COOKIES_BROWSER_OPTIONS"
@@ -452,13 +489,13 @@ function resetAll() {
                 <div v-else-if="defaultCookiesMode === 'file'" class="sub-row row-control-wide">
                   <el-input
                     v-model="defaultCookiesPath"
-                    placeholder="未选择 cookies.txt"
+                    :placeholder="t('options.noCookiesFile')"
                     readonly
                     size="default"
                   />
-                  <el-button size="default" @click="chooseCookiesFile">选择</el-button>
+                  <el-button size="default" @click="chooseCookiesFile">{{ t("common.select") }}</el-button>
                   <el-button v-if="defaultCookiesPath" size="default" text class="clear-btn" @click="clearCookiesFile">
-                    清除
+                    {{ t("common.clear") }}
                   </el-button>
                 </div>
               </div>
@@ -467,7 +504,7 @@ function resetAll() {
             <!-- 重试与分片 -->
             <div class="form-grid-two">
               <div class="form-col">
-                <span class="row-label">重试次数 (0-20)</span>
+                <span class="row-label">{{ t("settings.retriesLabel") }}</span>
                 <el-input-number
                   v-model="defaultRetries"
                   :min="0"
@@ -478,7 +515,7 @@ function resetAll() {
                 />
               </div>
               <div class="form-col">
-                <span class="row-label">并发分片数 (1-16)</span>
+                <span class="row-label">{{ t("settings.fragmentsLabel") }}</span>
                 <el-input-number
                   v-model="defaultConcurrentFragments"
                   :min="1"
@@ -493,13 +530,13 @@ function resetAll() {
             <!-- 网络代理 -->
             <div class="form-row">
               <div class="row-info">
-                <span class="row-label">默认网络代理</span>
-                <span class="row-desc">支持 HTTP / SOCKS5，例如 http://127.0.0.1:7890</span>
+                <span class="row-label">{{ t("settings.defaultProxy") }}</span>
+                <span class="row-desc">{{ t("settings.defaultProxyDesc") }}</span>
               </div>
               <div class="row-control-wide">
                 <el-input
                   v-model="defaultProxy"
-                  placeholder="可选: http://127.0.0.1:7890"
+                  :placeholder="t('settings.proxyPlaceholder')"
                   clearable
                   size="default"
                 />
@@ -508,44 +545,44 @@ function resetAll() {
           </div>
         </section>
 
-        <!-- 4. 偏好与系统 -->
+        <!-- 5. 偏好与系统 -->
         <section class="config-card">
           <div class="card-header">
-            <h3 class="card-title">快捷偏好</h3>
-            <span class="card-desc">日常使用体验优化</span>
+            <h3 class="card-title">{{ t("settings.preferencesTitle") }}</h3>
+            <span class="card-desc">{{ t("settings.preferencesDesc") }}</span>
           </div>
 
           <div class="switch-list">
             <div class="switch-row">
               <div class="switch-info">
-                <span class="switch-title">下载完成后自动打开目标文件夹</span>
-                <span class="switch-desc">任务下载成功后直接在系统文件管理器中展示</span>
+                <span class="switch-title">{{ t("settings.autoOpenDir") }}</span>
+                <span class="switch-desc">{{ t("settings.autoOpenDirDesc") }}</span>
               </div>
               <el-switch v-model="autoOpenDir" />
             </div>
 
             <div class="switch-row">
               <div class="switch-info">
-                <span class="switch-title">启动时自动粘贴剪贴板中的视频链接</span>
-                <span class="switch-desc">启动软件若剪贴板有合规 URL 则自动填充至输入框</span>
+                <span class="switch-title">{{ t("settings.autoPaste") }}</span>
+                <span class="switch-desc">{{ t("settings.autoPasteDesc") }}</span>
               </div>
               <el-switch v-model="autoPasteClipboard" />
             </div>
 
             <div class="switch-row danger-zone">
               <div class="switch-info">
-                <span class="switch-title danger-text">重置所有配置</span>
-                <span class="switch-desc">清空所有持久化的下载预设与偏好设置</span>
+                <span class="switch-title danger-text">{{ t("settings.resetTitle") }}</span>
+                <span class="switch-desc">{{ t("settings.resetDesc") }}</span>
               </div>
               <el-popconfirm
-                title="确定恢复所有设置为出厂默认值吗？"
-                confirm-button-text="确定重置"
-                cancel-button-text="取消"
+                :title="t('settings.resetConfirm')"
+                :confirm-button-text="t('settings.resetConfirmBtn')"
+                :cancel-button-text="t('common.cancel')"
                 confirm-button-type="danger"
                 @confirm="resetAll"
               >
                 <template #reference>
-                  <el-button type="danger" plain size="small">重置设置</el-button>
+                  <el-button type="danger" plain size="small">{{ t("settings.resetBtn") }}</el-button>
                 </template>
               </el-popconfirm>
             </div>
